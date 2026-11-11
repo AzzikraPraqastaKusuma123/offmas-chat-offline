@@ -134,23 +134,39 @@
         <!-- TAB 1: RADAR MESH -->
         <div id="tabContentRadar" class="h-full flex flex-col">
           <!-- Radar Canvas Area -->
-          <div class="relative w-full aspect-square max-h-[290px] mx-auto bg-[#0d1322] rounded-3xl border border-slate-800/90 overflow-hidden flex items-center justify-center shadow-inner my-auto">
+          <div class="relative w-full aspect-square max-h-[300px] mx-auto bg-[#090d16] rounded-3xl border border-emerald-500/30 overflow-hidden flex items-center justify-center shadow-2xl shadow-emerald-950/30 my-auto">
             
-            <!-- Concentric Grid Circles -->
-            <div class="absolute w-[80%] h-[80%] rounded-full border border-emerald-500/20"></div>
-            <div class="absolute w-[55%] h-[55%] rounded-full border border-emerald-500/25"></div>
-            <div class="absolute w-[30%] h-[30%] rounded-full border border-emerald-500/30"></div>
-            <div class="absolute w-full h-[1px] bg-emerald-500/10"></div>
-            <div class="absolute h-full w-[1px] bg-emerald-500/10"></div>
+            <!-- Tactical Compass Cardinal Markers -->
+            <span class="absolute top-2.5 text-[10px] font-mono font-bold text-emerald-400">N</span>
+            <span class="absolute bottom-2 text-[10px] font-mono text-slate-500">S</span>
+            <span class="absolute right-2.5 text-[10px] font-mono text-slate-500">E</span>
+            <span class="absolute left-2.5 text-[10px] font-mono text-slate-500">W</span>
+
+            <!-- Tactical Diagonal Guides -->
+            <div class="absolute w-[85%] h-[1px] bg-emerald-500/10 rotate-45"></div>
+            <div class="absolute w-[85%] h-[1px] bg-emerald-500/10 -rotate-45"></div>
+
+            <!-- Concentric Grid Circles & Distance Markers -->
+            <div class="absolute w-[82%] h-[82%] rounded-full border border-emerald-500/20 flex items-start justify-center pt-0.5">
+              <span class="text-[9px] font-mono text-emerald-500/40">100m</span>
+            </div>
+            <div class="absolute w-[56%] h-[56%] rounded-full border border-emerald-500/25 flex items-start justify-center pt-0.5">
+              <span class="text-[9px] font-mono text-emerald-500/40">50m</span>
+            </div>
+            <div class="absolute w-[30%] h-[30%] rounded-full border border-emerald-500/35 flex items-start justify-center pt-0.5">
+              <span class="text-[9px] font-mono text-emerald-500/50">25m</span>
+            </div>
+            <div class="absolute w-full h-[1px] bg-emerald-500/15"></div>
+            <div class="absolute h-full w-[1px] bg-emerald-500/15"></div>
 
             <!-- Rotating Radar Sweep Line -->
             <div class="absolute w-full h-full radar-sweep pointer-events-none">
-              <div class="w-1/2 h-1/2 bg-gradient-to-tr from-emerald-500/35 via-emerald-500/5 to-transparent origin-bottom-right rounded-tl-full"></div>
+              <div class="w-1/2 h-1/2 bg-gradient-to-tr from-emerald-500/40 via-emerald-500/10 to-transparent origin-bottom-right rounded-tl-full"></div>
             </div>
 
             <!-- Center Self Node -->
-            <div class="relative z-10 w-8 h-8 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-lg shadow-emerald-500/50">
-              <span class="text-[12px] font-bold text-slate-950 font-mono">YOU</span>
+            <div class="relative z-10 w-9 h-9 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-lg shadow-emerald-500/60 ring-4 ring-emerald-500/20">
+              <span class="text-[11px] font-black text-slate-950 font-mono">YOU</span>
             </div>
 
             <!-- Discovered Peer Nodes -->

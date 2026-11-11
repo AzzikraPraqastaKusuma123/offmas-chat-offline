@@ -531,22 +531,42 @@ class ConnectionService extends ChangeNotifier {
   }
 
   // ── READ ACKNOWLEDGEMENT (SEND TO SENDER) ─────────────────────────
-  Future<void> sendReadReceipt(String endpointId, List<String> messageIds) async {
+  Future<void> sendReadReceipt(String target, List<String> messageIds) async {
     if (messageIds.isEmpty) return;
     try {
+      final activeEndpoint = getActiveEndpointForNode(target);
+      final targetPeer = activeEndpoint != null ? _connectedPeers[activeEndpoint] : null;
+      final targetNodeId = targetPeer?.nodeId ?? target;
+
       final packet = jsonEncode({
         'id': _uuid.v4(),
         'v': 1,
         'type': AppConstants.packetTypeReadAck,
         'src': _crypto.nodeId,
-        'dst': endpointId,
+        'dst': targetNodeId,
         'msg_ids': messageIds,
+        'ttl': 6,
+        'hops': 0,
       });
 
-      await _nearby.sendBytesPayload(
-        endpointId,
-        Uint8List.fromList(utf8.encode(packet)),
-      );
+      final bytes = Uint8List.fromList(utf8.encode(packet));
+      bool sent = false;
+
+      if (activeEndpoint != null && _connectedPeers.containsKey(activeEndpoint)) {
+        try {
+          await _nearby.sendBytesPayload(activeEndpoint, bytes);
+          sent = true;
+        } catch (_) {}
+      }
+
+      // If direct send failed or endpoint not found, broadcast to connected mesh
+      if (!sent && _connectedPeers.isNotEmpty) {
+        for (final peerId in _connectedPeers.keys) {
+          try {
+            await _nearby.sendBytesPayload(peerId, bytes);
+          } catch (_) {}
+        }
+      }
     } catch (_) {}
   }
 
@@ -636,6 +656,9 @@ class ConnectionService extends ChangeNotifier {
             await _db.markSentMessageAsDelivered(ackMsgId);
             _receiptController.add(ackMsgId);
           }
+          if (dst != _crypto.nodeId && dst != 'DIRECT' && ttl > 1) {
+            _forwardMeshPacket(packet, endpointId, ttl, hops);
+          }
           return;
         }
 
@@ -644,6 +667,9 @@ class ConnectionService extends ChangeNotifier {
           if (msgIds != null && msgIds.isNotEmpty) {
             await _db.markSentMessagesAsRead(msgIds);
             _receiptController.add(msgIds.first);
+          }
+          if (dst != _crypto.nodeId && dst != 'DIRECT' && ttl > 1) {
+            _forwardMeshPacket(packet, endpointId, ttl, hops);
           }
           return;
         }
@@ -769,7 +795,7 @@ class ConnectionService extends ChangeNotifier {
             incrementUnread: !isCurrentChat,
           );
 
-          // Reply with Delivery ACK (Centang 2 Abu)
+          // Reply with Delivery ACK (Centang 2 Abu) back to sender
           try {
             final deliveryPacket = jsonEncode({
               'id': _uuid.v4(),
@@ -777,14 +803,18 @@ class ConnectionService extends ChangeNotifier {
               'type': AppConstants.packetTypeDeliveryAck,
               'ack_id': msgId,
               'src': _crypto.nodeId,
-              'dst': endpointId,
+              'dst': src,
+              'ttl': 6,
+              'hops': 0,
             });
-            await _nearby.sendBytesPayload(endpointId, Uint8List.fromList(utf8.encode(deliveryPacket)));
+            final ackBytes = Uint8List.fromList(utf8.encode(deliveryPacket));
+            final targetEp = getActiveEndpointForNode(src) ?? endpointId;
+            await _nearby.sendBytesPayload(targetEp, ackBytes);
           } catch (_) {}
 
           // If user is currently looking at chat, immediately reply with Read ACK (Centang 2 Biru)
           if (isCurrentChat) {
-            sendReadReceipt(endpointId, [msgId]);
+            sendReadReceipt(src, [msgId]);
           } else {
             // Push Notification
             if (type == AppConstants.packetTypeSos) {
@@ -871,23 +901,32 @@ class ConnectionService extends ChangeNotifier {
 
         // ── 6. MULTI-HOP MESH FORWARDING ──
         if (ttl > 1) {
-          final forwardPacket = Map<String, dynamic>.from(packet);
-          forwardPacket['ttl'] = ttl - 1;
-          forwardPacket['hops'] = hops + 1;
-
-          final forwardBytes = Uint8List.fromList(utf8.encode(jsonEncode(forwardPacket)));
-
-          for (final otherPeerId in _connectedPeers.keys) {
-            if (otherPeerId != endpointId) {
-              try {
-                await _nearby.sendBytesPayload(otherPeerId, forwardBytes);
-              } catch (_) {}
-            }
-          }
+          _forwardMeshPacket(packet, endpointId, ttl, hops);
         }
       } catch (e) {
         debugPrint('OFFMAS: Failed to parse payload: $e');
       }
+    }
+  }
+
+  void _forwardMeshPacket(Map<String, dynamic> packet, String incomingEndpointId, int ttl, int hops) {
+    if (ttl <= 1) return;
+    try {
+      final forwardPacket = Map<String, dynamic>.from(packet);
+      forwardPacket['ttl'] = ttl - 1;
+      forwardPacket['hops'] = hops + 1;
+
+      final forwardBytes = Uint8List.fromList(utf8.encode(jsonEncode(forwardPacket)));
+
+      for (final otherPeerId in _connectedPeers.keys) {
+        if (otherPeerId != incomingEndpointId) {
+          try {
+            _nearby.sendBytesPayload(otherPeerId, forwardBytes);
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      debugPrint('OFFMAS: Forward packet error: $e');
     }
   }
 

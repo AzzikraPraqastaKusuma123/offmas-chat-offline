@@ -1281,9 +1281,16 @@ class _SonarPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final maxR = size.width / 2;
 
-    // Rings
+    // Outer glow perimeter
+    final perimeterPaint = Paint()
+      ..color = AppTheme.primaryEmerald.withAlpha(30)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawCircle(center, maxR - 2, perimeterPaint);
+
+    // Concentric Range Rings
     final ringPaint = Paint()
-      ..color = AppTheme.primaryEmerald.withAlpha(45)
+      ..color = AppTheme.primaryEmerald.withAlpha(50)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
@@ -1293,10 +1300,30 @@ class _SonarPainter extends CustomPainter {
 
     // Crosshairs
     final crossPaint = Paint()
-      ..color = AppTheme.surfaceLight.withAlpha(60)
+      ..color = AppTheme.primaryEmerald.withAlpha(40)
       ..strokeWidth = 0.8;
-    canvas.drawLine(Offset(center.dx, 0), Offset(center.dx, size.height), crossPaint);
-    canvas.drawLine(Offset(0, center.dy), Offset(size.width, center.dy), crossPaint);
+    canvas.drawLine(Offset(center.dx, 4), Offset(center.dx, size.height - 4), crossPaint);
+    canvas.drawLine(Offset(4, center.dy), Offset(size.width - 4, center.dy), crossPaint);
+
+    // Diagonal tactical guides
+    final diagPaint = Paint()
+      ..color = AppTheme.surfaceLight.withAlpha(45)
+      ..strokeWidth = 0.6;
+    canvas.drawLine(Offset(center.dx - maxR * 0.7, center.dy - maxR * 0.7),
+        Offset(center.dx + maxR * 0.7, center.dy + maxR * 0.7), diagPaint);
+    canvas.drawLine(Offset(center.dx - maxR * 0.7, center.dy + maxR * 0.7),
+        Offset(center.dx + maxR * 0.7, center.dy - maxR * 0.7), diagPaint);
+
+    // Compass tick marks on perimeter (every 30 degrees)
+    final tickPaint = Paint()
+      ..color = AppTheme.primaryEmerald.withAlpha(90)
+      ..strokeWidth = 1.2;
+    for (int deg = 0; deg < 360; deg += 30) {
+      final rad = deg * pi / 180;
+      final p1 = Offset(center.dx + (maxR - 6) * cos(rad), center.dy + (maxR - 6) * sin(rad));
+      final p2 = Offset(center.dx + (maxR - 1) * cos(rad), center.dy + (maxR - 1) * sin(rad));
+      canvas.drawLine(p1, p2, tickPaint);
+    }
 
     // Rotating Radar Sweep
     final angle = animation.value * 2 * pi;
@@ -1311,6 +1338,28 @@ class _SonarPainter extends CustomPainter {
       ).createShader(Rect.fromCircle(center: center, radius: maxR));
 
     canvas.drawCircle(center, maxR, sweepPaint);
+
+    // Cardinal Points ('N', 'E', 'S', 'W')
+    _drawLabel(canvas, 'N', Offset(center.dx, 12), const Color(0xFF00E676));
+    _drawLabel(canvas, 'S', Offset(center.dx, size.height - 12), Colors.white38);
+    _drawLabel(canvas, 'E', Offset(size.width - 12, center.dy), Colors.white38);
+    _drawLabel(canvas, 'W', Offset(12, center.dy), Colors.white38);
+  }
+
+  void _drawLabel(Canvas canvas, String text, Offset pos, Color color) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: color,
+          fontSize: 9.5,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'monospace',
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(pos.dx - tp.width / 2, pos.dy - tp.height / 2));
   }
 
   @override

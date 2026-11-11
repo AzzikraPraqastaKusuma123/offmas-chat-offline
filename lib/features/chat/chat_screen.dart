@@ -704,11 +704,20 @@ class _MessageBubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.78,
         ),
         decoration: BoxDecoration(
-          color: isSos
-              ? AppTheme.emergencyRed.withAlpha(220)
+          gradient: isSos
+              ? const LinearGradient(
+                  colors: [Color(0xFFE53935), Color(0xFFC62828)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
               : isMe
-                  ? const Color(0xFF009650)
-                  : AppTheme.cardBackground,
+                  ? const LinearGradient(
+                      colors: [Color(0xFF00C853), Color(0xFF00897B)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+          color: (!isMe && !isSos) ? AppTheme.cardBackground : null,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
@@ -720,8 +729,10 @@ class _MessageBubble extends StatelessWidget {
               : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(35),
-              blurRadius: 4,
+              color: isMe
+                  ? const Color(0xFF00C853).withAlpha(45)
+                  : Colors.black.withAlpha(35),
+              blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],

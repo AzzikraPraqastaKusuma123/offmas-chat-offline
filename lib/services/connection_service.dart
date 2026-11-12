@@ -183,7 +183,26 @@ class ConnectionService extends ChangeNotifier {
         return entry.key;
       }
     }
+    for (final entry in _discoveredPeers.entries) {
+      if (entry.value.nodeId == target || entry.value.endpointId == target) {
+        return entry.key;
+      }
+    }
     return null;
+  }
+
+  /// Get persistent nodeId from ephemeral endpointId or return target if already nodeId
+  String getNodeForEndpoint(String endpointId) {
+    if (endpointId.startsWith('conv_')) {
+      return endpointId.replaceFirst('conv_', '');
+    }
+    if (_connectedPeers.containsKey(endpointId) && _connectedPeers[endpointId]!.nodeId != null) {
+      return _connectedPeers[endpointId]!.nodeId!;
+    }
+    if (_discoveredPeers.containsKey(endpointId) && _discoveredPeers[endpointId]!.nodeId != null) {
+      return _discoveredPeers[endpointId]!.nodeId!;
+    }
+    return endpointId;
   }
 
   // ── START (SAFE & RESILIENT) ──────────────────────────────────────
@@ -282,7 +301,7 @@ class ConnectionService extends ChangeNotifier {
 
   // ── CONNECTION CALLBACKS ──────────────────────────────────────────
   void _onConnectionInitiated(String id, ConnectionInfo info) async {
-    debugPrint('OFFMAS: Connection initiated from ${info.endpointName} ($id)');
+    debugPrint('OFFMAS: Connection initiated from ${info.endpointName} ($id), isIncoming: ${info.isIncomingConnection}');
 
     final req = IncomingRequest(
       endpointId: id,
@@ -293,15 +312,21 @@ class ConnectionService extends ChangeNotifier {
     // Store pending request so acceptConnection/rejectConnection can reference it
     _pendingRequests[id] = req;
 
-    // Show notification even when app is in background
-    await _notifications.showConnectionRequestNotification(
-      senderName: info.endpointName,
-      endpointId: id,
-    );
+    if (info.isIncomingConnection) {
+      // Receiver side (User B): Show notification and dialog to ACCEPT / REJECT
+      await _notifications.showConnectionRequestNotification(
+        senderName: info.endpointName,
+        endpointId: id,
+      );
 
-    // Emit to UI stream so HomeScreen can show the Accept/Reject dialog
-    _requestController.add(req);
-    _statusController.add('${info.endpointName} ingin terhubung...');
+      _requestController.add(req);
+      _statusController.add('${info.endpointName} meminta terhubung...');
+    } else {
+      // Sender side (User A): Automatically accept connection on our end
+      // because User A was the one who clicked 'Hubungkan'!
+      _statusController.add('Menghubungkan ke ${info.endpointName}... Menunggu persetujuan rekan...');
+      await acceptConnection(id);
+    }
   }
 
   void _onConnectionResult(String id, Status status) {
@@ -320,9 +345,10 @@ class ConnectionService extends ChangeNotifier {
       _pendingRequests.remove(id);
       _statusController.add('Terhubung dengan ${peer.displayName}');
 
-      // Save to DB
+      // Save to DB using persistent nodeId if available
+      final peerNodeId = peer.nodeId ?? getNodeForEndpoint(id);
       _db.upsertPeer({
-        'node_id': id,
+        'node_id': peerNodeId,
         'display_name': peer.displayName,
         'bio': peer.bio,
         'role': peer.role,
@@ -330,10 +356,10 @@ class ConnectionService extends ChangeNotifier {
         'is_verified': 1,
       });
 
-      // Ensure conversation exists
+      // Ensure conversation exists with persistent convId
       _db.upsertConversation({
-        'id': 'conv_$id',
-        'peer_id': id,
+        'id': 'conv_$peerNodeId',
+        'peer_id': peerNodeId,
         'title': peer.displayName,
         'is_group': 0,
         'last_message': 'Terhubung secara offline',
@@ -439,19 +465,23 @@ class ConnectionService extends ChangeNotifier {
 
       final activeEndpoint = getActiveEndpointForNode(target);
       final targetPeer = activeEndpoint != null ? _connectedPeers[activeEndpoint] : null;
-      final targetNodeId = targetPeer?.nodeId ?? target;
+      final targetNodeId = targetPeer?.nodeId ?? getNodeForEndpoint(target);
       final targetName = targetPeer?.displayName ?? 'Kontak';
+
+      // Real AES-GCM-256 authenticated encryption
+      final encryptedMap = await _crypto.encryptPayload(text);
 
       final packet = jsonEncode({
         'id': msgId,
-        'v': 1,
+        'v': 2,
         'type': AppConstants.packetTypeChat,
         'src': _crypto.nodeId,
         'sender_name': _localDisplayName,
-        'dst': 'DIRECT',
+        'dst': targetNodeId,
         'target_node': targetNodeId,
         'ttl': 6,
         'hops': 0,
+        'enc': encryptedMap,
         'msg': text,
         'ts': now.toUtc().toIso8601String(),
       });
@@ -483,10 +513,10 @@ class ConnectionService extends ChangeNotifier {
         return false;
       }
 
-      final convId = 'conv_$target';
+      final convId = 'conv_$targetNodeId';
       await _db.upsertConversation({
         'id': convId,
-        'peer_id': target,
+        'peer_id': targetNodeId,
         'title': targetName,
         'is_group': 0,
         'last_message': text,
@@ -527,9 +557,12 @@ class ConnectionService extends ChangeNotifier {
       final now = DateTime.now();
       _seenPacketIds.add(msgId);
 
+      // Real AES-GCM-256 authenticated encryption
+      final encryptedMap = await _crypto.encryptPayload(text);
+
       final packet = jsonEncode({
         'id': msgId,
-        'v': 1,
+        'v': 2,
         'type': AppConstants.packetTypeGroupChat,
         'group_id': groupId,
         'group_name': groupName,
@@ -538,6 +571,7 @@ class ConnectionService extends ChangeNotifier {
         'dst': 'GROUP_BROADCAST',
         'ttl': 6,
         'hops': 0,
+        'enc': encryptedMap,
         'msg': text,
         'ts': now.toUtc().toIso8601String(),
       });
@@ -693,7 +727,6 @@ class ConnectionService extends ChangeNotifier {
         final dst = packet['dst'] as String? ?? 'DIRECT';
         final ttl = packet['ttl'] as int? ?? 1;
         final hops = packet['hops'] as int? ?? 0;
-        final msg = packet['msg'] as String? ?? '';
         final tsRaw = packet['ts'] as String?;
         final ts = tsRaw != null ? DateTime.tryParse(tsRaw) ?? DateTime.now() : DateTime.now();
 
@@ -765,19 +798,27 @@ class ConnectionService extends ChangeNotifier {
         _seenPacketIds.add(msgId);
         if (_seenPacketIds.length > 5000) _seenPacketIds.remove(_seenPacketIds.first);
 
-        // ── 4. PROCESS 1-ON-1 CHAT ──
-        final isForMe = dst == 'DIRECT' ||
+        // ── 4. PROCESS 1-ON-1 CHAT & SOS ──
+        final isForMe = dst == _crypto.nodeId ||
+                        dst == 'DIRECT' ||
                         dst == 'BROADCAST' ||
-                        dst == _crypto.nodeId ||
-                        dst == endpointId ||
-                        _connectedPeers.containsKey(endpointId);
+                        type == AppConstants.packetTypeSos;
 
         if (isForMe && (type == AppConstants.packetTypeChat || type == AppConstants.packetTypeSos)) {
-          final convId = 'conv_$endpointId';
+          // Decrypt payload with AES-GCM-256 if encrypted map is present
+          String plainMsg = '';
+          if (packet['enc'] != null && packet['enc'] is Map) {
+            plainMsg = await _crypto.decryptPayload(Map<String, dynamic>.from(packet['enc']));
+          } else {
+            plainMsg = packet['msg'] as String? ?? '';
+          }
+
+          final peerNodeId = src;
+          final convId = 'conv_$peerNodeId';
           final peerName = _connectedPeers[endpointId]?.displayName ?? senderName;
 
           await _db.upsertPeer({
-            'node_id': endpointId,
+            'node_id': peerNodeId,
             'display_name': peerName,
             'last_seen': ts.toIso8601String(),
             'is_verified': 1,
@@ -785,35 +826,24 @@ class ConnectionService extends ChangeNotifier {
 
           await _db.upsertConversation({
             'id': convId,
-            'peer_id': endpointId,
+            'peer_id': peerNodeId,
             'title': peerName,
             'is_group': 0,
-            'last_message': msg,
+            'last_message': plainMsg,
             'last_message_at': ts.toIso8601String(),
           });
 
-          if (src != endpointId) {
-            await _db.upsertConversation({
-              'id': 'conv_$src',
-              'peer_id': src,
-              'title': peerName,
-              'is_group': 0,
-              'last_message': msg,
-              'last_message_at': ts.toIso8601String(),
-            });
-          }
-
           final isCurrentChat = activeChatEndpointId == endpointId ||
-                                activeChatEndpointId == src ||
+                                activeChatEndpointId == peerNodeId ||
                                 activeChatEndpointId == convId;
           final status = isCurrentChat ? AppConstants.statusRead : AppConstants.statusDelivered;
 
           await _db.insertMessage({
             'id': msgId,
             'conversation_id': convId,
-            'sender_node_id': src,
+            'sender_node_id': peerNodeId,
             'sender_name': peerName,
-            'content': msg,
+            'content': plainMsg,
             'message_type': type,
             'timestamp': ts.toIso8601String(),
             'status': status,
@@ -821,24 +851,9 @@ class ConnectionService extends ChangeNotifier {
             'is_mine': 0,
           });
 
-          if (src != endpointId) {
-            await _db.insertMessage({
-              'id': '${msgId}_src',
-              'conversation_id': 'conv_$src',
-              'sender_node_id': src,
-              'sender_name': peerName,
-              'content': msg,
-              'message_type': type,
-              'timestamp': ts.toIso8601String(),
-              'status': status,
-              'hop_count': hops,
-              'is_mine': 0,
-            });
-          }
-
           await _db.updateConversationSnippet(
             conversationId: convId,
-            lastMessage: msg,
+            lastMessage: plainMsg,
             lastMessageAt: ts.toIso8601String(),
             incrementUnread: !isCurrentChat,
           );
@@ -866,16 +881,16 @@ class ConnectionService extends ChangeNotifier {
           } else {
             // Push Notification
             if (type == AppConstants.packetTypeSos) {
-              await _notifications.showSosNotification(sender: peerName, content: msg);
+              await _notifications.showSosNotification(sender: peerName, content: plainMsg);
             } else {
-              await _notifications.showMessageNotification(sender: peerName, content: msg, conversationId: convId);
+              await _notifications.showMessageNotification(sender: peerName, content: plainMsg, conversationId: convId);
             }
           }
 
           _messageController.add(IncomingMessage(
             fromEndpointId: endpointId,
             fromDisplayName: peerName,
-            content: msg,
+            content: plainMsg,
             type: type,
             timestamp: ts,
             hopCount: hops,
@@ -888,6 +903,13 @@ class ConnectionService extends ChangeNotifier {
           final groupName = packet['group_name'] as String? ?? 'Grup Offline';
 
           if (groupId != null) {
+            String plainGroupMsg = '';
+            if (packet['enc'] != null && packet['enc'] is Map) {
+              plainGroupMsg = await _crypto.decryptPayload(Map<String, dynamic>.from(packet['enc']));
+            } else {
+              plainGroupMsg = packet['msg'] as String? ?? '';
+            }
+
             final convId = 'group_$groupId';
             final isCurrentChat = activeChatEndpointId == convId || activeChatEndpointId == groupId;
 
@@ -911,7 +933,7 @@ class ConnectionService extends ChangeNotifier {
               'conversation_id': convId,
               'sender_node_id': src,
               'sender_name': senderName,
-              'content': msg,
+              'content': plainGroupMsg,
               'message_type': AppConstants.packetTypeGroupChat,
               'timestamp': ts.toIso8601String(),
               'status': isCurrentChat ? AppConstants.statusRead : AppConstants.statusDelivered,
@@ -921,7 +943,7 @@ class ConnectionService extends ChangeNotifier {
 
             await _db.updateConversationSnippet(
               conversationId: convId,
-              lastMessage: '$senderName: $msg',
+              lastMessage: '$senderName: $plainGroupMsg',
               lastMessageAt: ts.toIso8601String(),
               incrementUnread: !isCurrentChat,
             );
@@ -929,7 +951,7 @@ class ConnectionService extends ChangeNotifier {
             if (!isCurrentChat) {
               await _notifications.showMessageNotification(
                 sender: '👥 [$groupName] $senderName',
-                content: msg,
+                content: plainGroupMsg,
                 conversationId: convId,
               );
             }
@@ -937,7 +959,7 @@ class ConnectionService extends ChangeNotifier {
             _messageController.add(IncomingMessage(
               fromEndpointId: endpointId,
               fromDisplayName: senderName,
-              content: msg,
+              content: plainGroupMsg,
               type: type,
               timestamp: ts,
               hopCount: hops,
@@ -948,7 +970,10 @@ class ConnectionService extends ChangeNotifier {
         }
 
         // ── 6. MULTI-HOP MESH FORWARDING ──
-        if (ttl > 1) {
+        // Only forward if TTL > 1 AND the packet is either:
+        // - Not specifically meant only for me, OR
+        // - A broadcast / group chat
+        if (ttl > 1 && (dst != _crypto.nodeId || dst == 'BROADCAST' || type == AppConstants.packetTypeGroupChat)) {
           _forwardMeshPacket(packet, endpointId, ttl, hops);
         }
       } catch (e) {

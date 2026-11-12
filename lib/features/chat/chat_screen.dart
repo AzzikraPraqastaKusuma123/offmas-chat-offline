@@ -55,8 +55,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _conversationId = 'group_${widget.groupId}';
       _conn.activeChatEndpointId = _conversationId;
     } else {
-      _conversationId = 'conv_${widget.endpointId}';
-      _conn.activeChatEndpointId = widget.endpointId;
+      final targetNode = _conn.getNodeForEndpoint(widget.endpointId);
+      _conversationId = 'conv_$targetNode';
+      _conn.activeChatEndpointId = targetNode;
     }
 
     _initConversation();
@@ -109,6 +110,7 @@ class _ChatScreenState extends State<ChatScreen> {
       } else if (!widget.isGroup &&
           (msg.fromEndpointId == widget.endpointId ||
            _conversationId.contains(msg.fromEndpointId) ||
+           _conversationId.contains(_conn.getNodeForEndpoint(msg.fromEndpointId)) ||
            msg.fromDisplayName.toLowerCase() == _currentPeerName.toLowerCase())) {
         final m = MessageModel(
           id: _uuid.v4(),

@@ -199,13 +199,34 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
 
+    // Check if GPS / Location service is turned on in Android settings
+    final isGpsOn = await PermissionHelper.isLocationServiceEnabled();
+    if (!isGpsOn && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ PENTING: Aktifkan "Layanan Lokasi / GPS" di status bar HP agar Bluetooth dapat memindai perangkat sekitar.'),
+          backgroundColor: AppTheme.warningOrange,
+          duration: Duration(seconds: 6),
+        ),
+      );
+    }
+
     try {
       final started = await _conn.startAll();
-      if (mounted) setState(() => _isActive = started);
+      if (mounted) {
+        setState(() => _isActive = started);
+        if (!started) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Gagal memulai radar. Pastikan Bluetooth dan GPS/Lokasi HP aktif.'),
+              backgroundColor: AppTheme.emergencyRed,
+            ),
+          );
+        }
+      }
     } catch (e) {
-      // Any unexpected error — treat as active, Nearby will handle retry
-      debugPrint('OFFMAS _toggleService error (ignored): $e');
-      if (mounted) setState(() => _isActive = true);
+      debugPrint('OFFMAS _toggleService error: $e');
+      if (mounted) setState(() => _isActive = false);
     }
   }
 

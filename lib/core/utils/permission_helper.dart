@@ -6,19 +6,22 @@ class PermissionHelper {
   static Future<bool> requestNearbyPermissions() async {
     try {
       if (Platform.isAndroid) {
+        // Request all essential permissions for Nearby Connections
         Map<Permission, PermissionStatus> statuses = await [
           Permission.bluetoothScan,
           Permission.bluetoothAdvertise,
           Permission.bluetoothConnect,
           Permission.location,
+          Permission.nearbyWifiDevices,
         ].request();
 
         bool hasBluetooth = (statuses[Permission.bluetoothScan]?.isGranted ?? false) ||
                             (statuses[Permission.bluetoothConnect]?.isGranted ?? false) ||
-                            (statuses[Permission.location]?.isGranted ?? false);
+                            (statuses[Permission.bluetooth]?.isGranted ?? false);
+        bool hasLocation = statuses[Permission.location]?.isGranted ?? false;
 
         debugPrint('OFFMAS Permission Status: $statuses');
-        return hasBluetooth;
+        return hasBluetooth || hasLocation;
       } else if (Platform.isIOS) {
         Map<Permission, PermissionStatus> statuses = await [
           Permission.bluetooth,
@@ -30,6 +33,17 @@ class PermissionHelper {
     } catch (e) {
       debugPrint('Error requesting permissions: $e');
       return false;
+    }
+  }
+
+  static Future<bool> isLocationServiceEnabled() async {
+    try {
+      if (Platform.isAndroid) {
+        return await Permission.location.serviceStatus.isEnabled;
+      }
+      return true;
+    } catch (_) {
+      return true;
     }
   }
 

@@ -224,31 +224,42 @@ class ConnectionService extends ChangeNotifier {
     _isDiscovering = false;
 
     // Small delay to let the native layer settle
-    await Future.delayed(const Duration(milliseconds: 400));
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    bool adSuccess = false;
+    bool disSuccess = false;
 
     try {
-      await _startAdvertising();
+      adSuccess = await _startAdvertising();
     } catch (e) {
-      debugPrint('OFFMAS: Advertising error (non-fatal): $e');
-    }
-    try {
-      await _startDiscovery();
-    } catch (e) {
-      debugPrint('OFFMAS: Discovery error (non-fatal): $e');
+      debugPrint('OFFMAS: Advertising error: $e');
     }
 
-    // Treat as active even if only one side started
-    _isAdvertising = true;
-    _isDiscovering = true;
+    try {
+      disSuccess = await _startDiscovery();
+    } catch (e) {
+      debugPrint('OFFMAS: Discovery error: $e');
+    }
+
+    if (!adSuccess && !disSuccess) {
+      _isAdvertising = false;
+      _isDiscovering = false;
+      _statusController.add('Gagal memindai · Pastikan Bluetooth & GPS HP aktif');
+      notifyListeners();
+      return false;
+    }
+
+    _isAdvertising = adSuccess;
+    _isDiscovering = disSuccess;
     _statusController.add('Radar aktif · Memindai gelombang sekitar...');
     notifyListeners();
     return true;
   }
 
-  Future<void> _startAdvertising() async {
-    if (_isAdvertising) return;
+  Future<bool> _startAdvertising() async {
+    if (_isAdvertising) return true;
     try {
-      await _nearby.startAdvertising(
+      final success = await _nearby.startAdvertising(
         _localDisplayName,
         Strategy.P2P_CLUSTER,
         onConnectionInitiated: _onConnectionInitiated,
@@ -256,20 +267,24 @@ class ConnectionService extends ChangeNotifier {
         onDisconnected: _onDisconnected,
         serviceId: AppConstants.serviceId,
       );
-      _isAdvertising = true;
-      debugPrint('OFFMAS: Advertising started');
+      _isAdvertising = success;
+      debugPrint('OFFMAS: Advertising started: $success');
+      return success;
     } catch (e) {
+      debugPrint('OFFMAS: Advertising exception: $e');
       if (e.toString().contains('8001') ||
           e.toString().contains('ALREADY_ADVERTISING')) {
         _isAdvertising = true;
+        return true;
       }
+      return false;
     }
   }
 
-  Future<void> _startDiscovery() async {
-    if (_isDiscovering) return;
+  Future<bool> _startDiscovery() async {
+    if (_isDiscovering) return true;
     try {
-      await _nearby.startDiscovery(
+      final success = await _nearby.startDiscovery(
         _localDisplayName,
         Strategy.P2P_CLUSTER,
         onEndpointFound: (String id, String name, String serviceId) {
@@ -290,12 +305,17 @@ class ConnectionService extends ChangeNotifier {
         },
         serviceId: AppConstants.serviceId,
       );
-      _isDiscovering = true;
+      _isDiscovering = success;
+      debugPrint('OFFMAS: Discovery started: $success');
+      return success;
     } catch (e) {
+      debugPrint('OFFMAS: Discovery exception: $e');
       if (e.toString().contains('8002') ||
           e.toString().contains('ALREADY_DISCOVERING')) {
         _isDiscovering = true;
+        return true;
       }
+      return false;
     }
   }
 

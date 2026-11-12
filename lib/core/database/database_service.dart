@@ -133,8 +133,17 @@ class DatabaseService {
   // ── PEERS (KONTAK) ────────────────────────────────────────────────
   Future<void> upsertPeer(Map<String, dynamic> peer) async {
     final db = await database;
-    await db.insert('peers', peer,
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    final nodeId = peer['node_id'] as String;
+    final existing = await db.query('peers', where: 'node_id = ?', whereArgs: [nodeId]);
+    if (existing.isNotEmpty) {
+      // Merge with existing row to preserve is_saved, role, etc.
+      final merged = Map<String, dynamic>.from(existing.first);
+      merged.addAll(peer);
+      await db.update('peers', merged, where: 'node_id = ?', whereArgs: [nodeId]);
+    } else {
+      await db.insert('peers', peer,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
   }
 
   Future<List<Map<String, dynamic>>> getAllPeers() async {

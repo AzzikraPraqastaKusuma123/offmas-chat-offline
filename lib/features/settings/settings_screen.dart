@@ -25,18 +25,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _savedSuccess = false;
 
   final List<Map<String, dynamic>> _roleOptions = [
-    {'title': 'Warga', 'icon': Icons.person, 'color': AppTheme.primaryEmerald},
-    {'title': 'Relawan', 'icon': Icons.volunteer_activism, 'color': AppTheme.accentCyan},
+    {'title': 'Operatif Anonim', 'icon': Icons.security, 'color': AppTheme.primaryEmerald},
+    {'title': 'Relawan Taktis', 'icon': Icons.volunteer_activism, 'color': AppTheme.accentCyan},
     {'title': 'Tim Medis', 'icon': Icons.medical_services, 'color': AppTheme.warningOrange},
     {'title': 'SAR & Evakuasi', 'icon': Icons.emergency, 'color': AppTheme.emergencyRed},
-    {'title': 'Operator Mesh', 'icon': Icons.cell_tower, 'color': const Color(0xFFB388FF)},
+    {'title': 'Sentry Mesh', 'icon': Icons.cell_tower, 'color': const Color(0xFFB388FF)},
   ];
 
   final List<String> _quickBioPresets = [
-    '🟢 Kondisi Aman & Siaga',
-    '🔴 Butuh Bantuan Medis Segera',
-    '🟡 Siap Mengantar Logistik',
-    '🔋 Shelter / Menghemat Daya',
+    '👻 Node Anonim Terenkripsi',
+    '🟢 Sektor Aman & Siaga',
+    '🔴 Butuh Dukungan Medis Segera',
+    '🟡 Siap Kirim Logistik',
+    '🔋 Mode Pasif / Hemat Daya',
   ];
 
   @override
@@ -108,6 +109,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _rotateAnonymousIdentity() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.cardBackground,
+        title: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: AppTheme.accentCyan),
+            SizedBox(width: 8),
+            Text('Rotasi Identitas Anonim'),
+          ],
+        ),
+        content: const Text(
+          'Tindakan ini akan membuat Node ID acak baru, kunci enkripsi AES baru, dan callsign baru secara instan. Jejak identitas lama Anda akan terputus dari jaringan mesh.',
+          style: TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentCyan),
+            child: const Text('Acak Identitas Sekarang', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isSaving = true);
+    final newCallsign = await _conn.rotateAnonymousIdentity();
+    _nameController.text = newCallsign;
+    _bioController.text = '👻 Node Anonim Terenkripsi';
+    _selectedRole = 'Operatif Anonim';
+    _nodeId = _crypto.nodeId;
+    setState(() => _isSaving = false);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✓ Identitas berhasil diacak menjadi: $newCallsign'),
+          backgroundColor: AppTheme.primaryEmerald,
+        ),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -133,24 +184,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
             role: _selectedRole,
             nodeId: _nodeId,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // ── ANONYMOUS GHOST IDENTITY BANNER ──
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.primaryEmerald.withAlpha(25),
+                  AppTheme.accentCyan.withAlpha(15),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.primaryEmerald.withAlpha(80)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryEmerald.withAlpha(40),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.shield_outlined, color: AppTheme.primaryEmerald, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('MODE ANONIM PENUH (GHOST)',
+                              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                          Text('Tanpa nomor HP, email, atau jejak identitas pribadi',
+                              style: TextStyle(color: Colors.white60, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isSaving ? null : _rotateAnonymousIdentity,
+                    icon: const Icon(Icons.casino_outlined, size: 16),
+                    label: const Text('Acak Callsign & Kunci Baru', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppTheme.accentCyan),
+                      foregroundColor: AppTheme.accentCyan,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
 
           // ── EDIT PROFILE FORM ──
-          _SectionTitle('Edit Profil Radar'),
+          _SectionTitle('Edit Callsign & Peran Taktis'),
           _SettingCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Nama Tampilan (Terlihat di Radar)',
+                const Text('Callsign Taktis (Terlihat di Radar)',
                     style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _nameController,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
-                    hintText: 'Masukkan nama Anda...',
-                    prefixIcon: Icon(Icons.person_outline, color: AppTheme.primaryEmerald),
+                    hintText: 'Contoh: Phantom-7F89',
+                    prefixIcon: Icon(Icons.shield_outlined, color: AppTheme.primaryEmerald),
                   ),
                 ),
                 const SizedBox(height: 16),

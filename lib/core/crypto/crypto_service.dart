@@ -35,6 +35,46 @@ class CryptoService {
     return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join().toUpperCase();
   }
 
+  /// Generate an untraceable tactical Anonymous Ghost Callsign
+  static String generateGhostCallsign([String? suffix]) {
+    const prefixes = [
+      'Ghost',
+      'Phantom',
+      'Spectre',
+      'Shadow',
+      'Viper',
+      'Echo',
+      'Cipher',
+      'Raven',
+      'Delta',
+      'Apex',
+      'Nemesis',
+      'Onyx',
+      'Kestrel'
+    ];
+    final rand = Random.secure();
+    final prefix = prefixes[rand.nextInt(prefixes.length)];
+    final code = suffix ?? rand.nextInt(0xFFFF).toRadixString(16).toUpperCase().padLeft(4, '0');
+    return '$prefix-$code';
+  }
+
+  /// Rotate identity completely: creates brand new node ID and cryptographic session keys
+  Future<String> rotateIdentity() async {
+    final newId = _generateRandomId();
+    _nodeId = newId;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(AppConstants.prefNodeId, newId);
+
+    // Generate fresh session key
+    final secretKeyBytes = List<int>.generate(32, (i) => Random.secure().nextInt(256));
+    _sessionKey = SecretKey(secretKeyBytes);
+
+    final newCallsign = generateGhostCallsign(newId.substring(0, 4));
+    await prefs.setString(AppConstants.prefDisplayName, newCallsign);
+    return newCallsign;
+  }
+
   /// Encrypt a string payload with AES-GCM-256
   Future<Map<String, String>> encryptPayload(String plaintext) async {
     final secretKey = _sessionKey ?? await _algorithm.newSecretKey();

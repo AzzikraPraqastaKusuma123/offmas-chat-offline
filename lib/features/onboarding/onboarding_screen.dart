@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/crypto/crypto_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/connection_service.dart';
 import '../home/home_screen.dart';
@@ -16,17 +17,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _nameController = TextEditingController();
   bool _loading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Default to anonymous tactical callsign
+    _nameController.text = CryptoService.generateGhostCallsign();
+  }
+
+  void _randomizeCallsign() {
+    setState(() {
+      _nameController.text = CryptoService.generateGhostCallsign();
+    });
+  }
+
   Future<void> _onStart() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Masukkan nama tampilan Anda terlebih dahulu')),
+        const SnackBar(content: Text('Pilih atau acak callsign anonim Anda')),
       );
       return;
     }
     setState(() => _loading = true);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConstants.prefDisplayName, name);
+    await prefs.setString(AppConstants.prefBio, 'Node Anonim Terenkripsi');
+    await prefs.setString(AppConstants.prefRole, 'Operatif Anonim');
     await ConnectionService().setDisplayName(name);
 
     if (!mounted) return;
@@ -93,33 +109,50 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
               const Spacer(),
               // Features
+              _featureRow(Icons.security, '100% Anonim: Tanpa nomor HP, email, atau akun'),
+              const SizedBox(height: 12),
               _featureRow(Icons.bluetooth, 'Tanpa internet, tanpa menara seluler'),
               const SizedBox(height: 12),
               _featureRow(Icons.hub, 'Jaringan mesh multi-hop otomatis'),
               const SizedBox(height: 12),
-              _featureRow(Icons.lock_outline, 'Enkripsi AES-256 end-to-end'),
+              _featureRow(Icons.lock_outline, 'Enkripsi AES-256 end-to-end murni di HP'),
               const SizedBox(height: 12),
               _featureRow(Icons.sos, 'Siaran darurat SOS satu sentuhan'),
               const Spacer(),
-              const Text(
-                'Nama Tampilan Anda',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Callsign Anonim Anda (Ghost ID)',
+                    style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Tidak terlacak',
+                    style: TextStyle(color: AppTheme.primaryEmerald, fontSize: 11),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _nameController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Contoh: Budi Santoso',
-                  prefixIcon: Icon(Icons.person_outline, color: AppTheme.primaryEmerald),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  hintText: 'Contoh: Phantom-7F89',
+                  prefixIcon: const Icon(Icons.shield_outlined, color: AppTheme.primaryEmerald),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.casino_outlined, color: AppTheme.accentCyan),
+                    tooltip: 'Acak Callsign Anonim',
+                    onPressed: _randomizeCallsign,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: ElevatedButton.icon(
                   onPressed: _loading ? null : _onStart,
-                  child: _loading
+                  icon: const Icon(Icons.visibility_off, size: 18),
+                  label: _loading
                       ? const SizedBox(
                           width: 22,
                           height: 22,
@@ -128,7 +161,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             color: Colors.black,
                           ),
                         )
-                      : const Text('MULAI OFFMAS', style: TextStyle(fontSize: 16)),
+                      : const Text('MASUK MODE ANONIM', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 16),

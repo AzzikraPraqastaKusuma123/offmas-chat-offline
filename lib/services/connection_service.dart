@@ -100,6 +100,10 @@ class ConnectionService extends ChangeNotifier {
   final _messageController = StreamController<IncomingMessage>.broadcast();
   final _statusController = StreamController<String>.broadcast();
   final _receiptController = StreamController<String>.broadcast();
+  final _connectedPeerController = StreamController<DiscoveredPeerInfo>.broadcast();
+
+  // Pending requests waiting for user accept/reject (endpointId -> request)
+  final Map<String, IncomingRequest> _pendingRequests = {};
 
   // Getters
   Stream<List<DiscoveredPeerInfo>> get peersStream => _peersController.stream;
@@ -107,6 +111,7 @@ class ConnectionService extends ChangeNotifier {
   Stream<IncomingMessage> get messageStream => _messageController.stream;
   Stream<String> get statusStream => _statusController.stream;
   Stream<String> get receiptStream => _receiptController.stream;
+  Stream<DiscoveredPeerInfo> get connectedPeerStream => _connectedPeerController.stream;
   String get localDisplayName => _localDisplayName;
   String get localBio => _localBio;
   String get localRole => _localRole;
@@ -119,10 +124,30 @@ class ConnectionService extends ChangeNotifier {
     await _crypto.init();
     await _notifications.init();
     final prefs = await SharedPreferences.getInstance();
+    final defaultGhostName = CryptoService.generateGhostCallsign(
+      _crypto.nodeId.isNotEmpty ? _crypto.nodeId.substring(0, 4) : null,
+    );
     _localDisplayName =
-        prefs.getString(AppConstants.prefDisplayName) ?? 'OFFMAS-${_crypto.nodeId.substring(0, 4)}';
-    _localBio = prefs.getString(AppConstants.prefBio) ?? 'Siaga Offline';
-    _localRole = prefs.getString(AppConstants.prefRole) ?? 'Umum';
+        prefs.getString(AppConstants.prefDisplayName) ?? defaultGhostName;
+    _localBio = prefs.getString(AppConstants.prefBio) ?? 'Node Anonim Terenkripsi';
+    _localRole = prefs.getString(AppConstants.prefRole) ?? 'Operatif Anonim';
+  }
+
+  /// Completely rotate anonymous identity and announce across mesh
+  Future<String> rotateAnonymousIdentity() async {
+    final newCallsign = await _crypto.rotateIdentity();
+    _localDisplayName = newCallsign;
+    _localBio = 'Node Anonim Terenkripsi';
+    _localRole = 'Operatif Anonim';
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(AppConstants.prefDisplayName, newCallsign);
+    await prefs.setString(AppConstants.prefBio, _localBio);
+    await prefs.setString(AppConstants.prefRole, _localRole);
+
+    await _broadcastProfileSync();
+    notifyListeners();
+    return newCallsign;
   }
 
   Future<void> updateProfile({
@@ -258,25 +283,41 @@ class ConnectionService extends ChangeNotifier {
   // ── CONNECTION CALLBACKS ──────────────────────────────────────────
   void _onConnectionInitiated(String id, ConnectionInfo info) async {
     debugPrint('OFFMAS: Connection initiated from ${info.endpointName} ($id)');
-    _statusController.add('Menghubungkan ke ${info.endpointName}...');
 
-    // Auto-accept connection so mesh and P2P connection connects without blocking PIN dialog failure!
-    await acceptConnection(id);
-
-    _requestController.add(IncomingRequest(
+    final req = IncomingRequest(
       endpointId: id,
       displayName: info.endpointName,
       authToken: info.authenticationToken,
-    ));
+    );
+
+    // Store pending request so acceptConnection/rejectConnection can reference it
+    _pendingRequests[id] = req;
+
+    // Show notification even when app is in background
+    await _notifications.showConnectionRequestNotification(
+      senderName: info.endpointName,
+      endpointId: id,
+    );
+
+    // Emit to UI stream so HomeScreen can show the Accept/Reject dialog
+    _requestController.add(req);
+    _statusController.add('${info.endpointName} ingin terhubung...');
   }
 
   void _onConnectionResult(String id, Status status) {
     if (status == Status.CONNECTED) {
       debugPrint('OFFMAS: Connected to $id');
+
+      // Resolve peer name: discovered map → pending request → fallback
+      final pendingReq = _pendingRequests[id];
+      final discoveredName = _discoveredPeers[id]?.displayName;
+      final peerName = discoveredName ?? pendingReq?.displayName ?? id;
+
       final peer = _discoveredPeers[id] ??
-          DiscoveredPeerInfo(endpointId: id, displayName: id);
+          DiscoveredPeerInfo(endpointId: id, displayName: peerName);
       peer.status = PeerStatus.connected;
       _connectedPeers[id] = peer;
+      _pendingRequests.remove(id);
       _statusController.add('Terhubung dengan ${peer.displayName}');
 
       // Save to DB
@@ -303,10 +344,14 @@ class ConnectionService extends ChangeNotifier {
       // Exchange profiles immediately upon connection
       _sendProfileSync(id);
 
+      // Emit newly connected peer so HomeScreen can open chat automatically
+      _connectedPeerController.add(peer);
+
       _peersController.add(_discoveredPeers.values.toList());
       notifyListeners();
     } else {
-      _statusController.add('Koneksi belum tersambung');
+      _pendingRequests.remove(id);
+      _statusController.add('Koneksi ditolak atau gagal');
     }
   }
 
@@ -364,6 +409,7 @@ class ConnectionService extends ChangeNotifier {
 
   Future<void> acceptConnection(String endpointId) async {
     try {
+      _pendingRequests.remove(endpointId);
       await _nearby.acceptConnection(
         endpointId,
         onPayLoadRecieved: _onPayloadReceived,
@@ -376,7 +422,9 @@ class ConnectionService extends ChangeNotifier {
 
   Future<void> rejectConnection(String endpointId) async {
     try {
+      _pendingRequests.remove(endpointId);
       await _nearby.rejectConnection(endpointId);
+      _statusController.add('Permintaan koneksi ditolak');
     } catch (e) {
       debugPrint('OFFMAS: Reject connection error: $e');
     }
@@ -962,6 +1010,7 @@ class ConnectionService extends ChangeNotifier {
     _messageController.close();
     _statusController.close();
     _receiptController.close();
+    _connectedPeerController.close();
     super.dispose();
   }
 }

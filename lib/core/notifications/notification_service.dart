@@ -17,6 +17,8 @@ class NotificationService {
   static const String chatChannelName = 'Pesan OFFMAS';
   static const String sosChannelId = 'offmas_sos_channel';
   static const String sosChannelName = 'Peringatan Darurat SOS';
+  static const String connectChannelId = 'offmas_connect_channel';
+  static const String connectChannelName = 'Permintaan Terhubung OFFMAS';
 
   Future<void> init() async {
     if (_initialized) return;
@@ -94,6 +96,82 @@ class NotificationService {
   }
 
   /// Show high-priority SOS emergency notification
+  /// Show connection request notification (even if app is in background)
+  Future<void> showConnectionRequestNotification({
+    required String senderName,
+    required String endpointId,
+  }) async {
+    try {
+      const androidDetails = AndroidNotificationDetails(
+        connectChannelId,
+        connectChannelName,
+        channelDescription: 'Notifikasi permintaan terhubung antar perangkat OFFMAS',
+        importance: Importance.max,
+        priority: Priority.high,
+        showWhen: true,
+        enableVibration: true,
+        icon: '@mipmap/ic_launcher',
+        color: Color(0xFF00E676),
+      );
+
+      const notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      );
+
+      final notificationId = 50000 + (endpointId.hashCode.abs() % 10000);
+
+      await _notificationsPlugin.show(
+        notificationId,
+        '📡 Permintaan Terhubung',
+        '$senderName ingin terhubung ke jaringan Anda',
+        notificationDetails,
+        payload: 'connect_request:$endpointId',
+      );
+    } catch (e) {
+      debugPrint('Error showing connection request notification: $e');
+    }
+  }
+
+  /// Show notification when a connection is accepted
+  Future<void> showConnectionAcceptedNotification({
+    required String peerName,
+  }) async {
+    try {
+      const androidDetails = AndroidNotificationDetails(
+        connectChannelId,
+        connectChannelName,
+        channelDescription: 'Notifikasi permintaan terhubung antar perangkat OFFMAS',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+        color: Color(0xFF00E676),
+      );
+
+      const notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: false,
+          presentSound: true,
+        ),
+      );
+
+      await _notificationsPlugin.show(
+        88888,
+        '🟢 Terhubung!',
+        '$peerName menerima permintaan koneksi Anda',
+        notificationDetails,
+      );
+    } catch (e) {
+      debugPrint('Error showing connection accepted notification: $e');
+    }
+  }
+
   Future<void> showSosNotification({
     required String sender,
     required String content,

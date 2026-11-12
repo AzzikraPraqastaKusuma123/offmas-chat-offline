@@ -3,677 +3,527 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OFFMAS - Interactive Live Preview</title>
-  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <title>OFFMAS - Interactive Live Preview v3</title>
   <style>
-    @keyframes radarSweep {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    @keyframes pulseRing {
-      0% { transform: scale(0.6); opacity: 0.9; }
-      100% { transform: scale(2.4); opacity: 0; }
-    }
-    @keyframes pingSlow {
-      0%, 100% { transform: scale(1); opacity: 0.8; }
-      50% { transform: scale(1.15); opacity: 1; }
-    }
-    .radar-sweep {
-      transform-origin: center center;
-      animation: radarSweep 4s linear infinite;
-    }
-    .pulse-ring {
-      animation: pulseRing 2.4s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
-    }
-    .ping-slow {
-      animation: pingSlow 1.8s ease-in-out infinite;
-    }
-    /* Custom Scrollbar */
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: #0b0f19; }
-    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
-    ::-webkit-scrollbar-thumb:hover { background: #10b981; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #060b14; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; }
+    @keyframes radarSweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes pulseRing { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(2.6); opacity: 0; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes dotPulse { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.4); opacity: 1; } }
+    .radar-sweep { transform-origin: center; animation: radarSweep 4s linear infinite; }
+    .blink { animation: blink 1.2s ease-in-out infinite; }
+    .peer-dot { animation: dotPulse 1.8s ease-in-out infinite; }
+    .phone { width: 360px; background: #0b0f19; border: 3px solid #1e293b; border-radius: 44px; overflow: hidden; position: relative; box-shadow: 0 0 60px rgba(0,230,118,0.08), 0 32px 64px rgba(0,0,0,0.6); height: 740px; display: flex; flex-direction: column; }
+    .tab-btn { flex: 1; padding: 8px 4px; background: none; border: none; color: #64748b; font-size: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s; }
+    .tab-btn.active { color: #00e676; }
+    .tab-btn svg { width: 20px; height: 20px; }
+    .peer-card { background: #111827; border: 1px solid #1e293b; border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.2s; margin-bottom: 8px; }
+    .peer-card:hover { border-color: #00e67660; background: #0f1f14; }
+    .peer-card:active { transform: scale(0.98); }
+    .peer-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; flex-shrink: 0; }
+    .bubble-me { background: linear-gradient(135deg, #00e676, #00bfa5); color: #000; border-radius: 18px 18px 4px 18px; padding: 10px 14px; max-width: 75%; margin-left: auto; }
+    .bubble-them { background: #1e293b; color: #e2e8f0; border-radius: 18px 18px 18px 4px; padding: 10px 14px; max-width: 75%; }
+    .bottom-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: #111827; border-radius: 24px 24px 0 0; padding: 20px 20px 32px; z-index: 50; animation: slideUp 0.3s ease-out; border-top: 1px solid #1e293b; }
+    .sheet-handle { width: 36px; height: 4px; background: #334155; border-radius: 2px; margin: 0 auto 20px; }
+    .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); z-index: 40; backdrop-filter: blur(2px); }
+    .btn-green { background: #00e676; color: #000; border: none; border-radius: 12px; padding: 13px; font-weight: 900; font-size: 14px; cursor: pointer; letter-spacing: 0.5px; transition: all 0.15s; width: 100%; }
+    .btn-green:hover { background: #00ff88; }
+    .btn-red { background: none; color: #ff1744; border: 1.5px solid #ff1744; border-radius: 12px; padding: 13px; font-weight: 700; font-size: 13px; cursor: pointer; letter-spacing: 0.5px; transition: all 0.15s; width: 100%; }
+    .btn-red:hover { background: #ff174415; }
+    .btn-outline { background: none; color: #94a3b8; border: 1px solid #334155; border-radius: 10px; padding: 10px 14px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+    .countdown-fill { height: 100%; background: #06b6d4; border-radius: 4px; transition: width 0.9s linear; }
+    .toast { position: absolute; top: 70px; left: 12px; right: 12px; background: #1e293b; border: 1px solid #00e67650; border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; z-index: 60; animation: fadeIn 0.3s ease-out; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+    .screen { display: none; flex-direction: column; flex: 1; overflow: hidden; position:absolute; inset:0; z-index:30; background:#0b0f19; }
+    .screen.active { display: flex; animation: fadeIn 0.25s ease-out; }
+    .tab-content { display: none; flex: 1; overflow-y: auto; padding: 12px; }
+    .tab-content.active { display: block; }
+    ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
+    .badge { display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+    .fab-sos { position: absolute; bottom: 70px; right: 14px; background: #ff1744; border: none; border-radius: 20px; padding: 10px 18px; color: #fff; font-weight: 900; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 16px rgba(255,23,68,0.4); letter-spacing: 0.5px; transition: all 0.2s; z-index:20; }
+    .scenario-btn { background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 8px 14px; color: #94a3b8; font-size: 11px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .scenario-btn.active-scenario { background: #0d2a1a; border-color: #00e676; color: #00e676; }
+    .scenario-btn:hover { border-color: #00e67660; color: #00e676; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 flex flex-col items-center justify-center min-h-screen p-2 sm:p-4 font-sans select-none">
-
-  <!-- Main Container -->
-  <div class="w-full max-w-md flex flex-col items-center">
-    
-    <!-- Header Banner -->
-    <div class="w-full flex items-center justify-between mb-3 px-2">
-      <div class="flex items-center gap-2">
-        <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
-        <span class="text-xs font-mono tracking-wider uppercase text-emerald-400 font-semibold">OFFMAS INTERACTIVE PREVIEW</span>
+<body>
+<div style="width:360px; display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; padding:0 4px;">
+  <div style="display:flex; align-items:center; gap:8px;">
+    <div style="width:10px; height:10px; border-radius:50%; background:#00e676; animation: blink 1.2s infinite;"></div>
+    <span style="font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#00e676;">GHOST MESH · ANONIM 100%</span>
+  </div>
+  <span style="font-size:10px; color:#475569; font-family:monospace;">v3.0 — DEMO</span>
+</div>
+<div style="width:360px; display:flex; gap:6px; margin-bottom:12px; overflow-x:auto; padding:2px;">
+  <button class="scenario-btn active-scenario" onclick="setScenario('radar')" id="scen-radar">📡 Radar</button>
+  <button class="scenario-btn" onclick="setScenario('request')" id="scen-request">🔗 Minta Terhubung</button>
+  <button class="scenario-btn" onclick="setScenario('accept')" id="scen-accept">✅ Terima/Tolak</button>
+  <button class="scenario-btn" onclick="setScenario('chat')" id="scen-chat">💬 Chat Aktif</button>
+  <button class="scenario-btn" onclick="setScenario('notif')" id="scen-notif">🔔 Notifikasi</button>
+</div>
+<div class="phone" id="phoneShell">
+  <!-- Notch -->
+  <div style="background:#060b14; padding:6px 20px 4px; display:flex; align-items:center; justify-content:space-between;">
+    <span style="font-size:11px; color:#64748b; font-weight:600;" id="liveClock">10:11</span>
+    <div style="width:60px; height:12px; background:#111827; border-radius:999px; display:flex; align-items:center; justify-content:center;"><div style="width:8px; height:8px; border-radius:50%; background:#1e293b;"></div></div>
+    <span style="font-size:10px; color:#64748b;">📡 ▮▮▮</span>
+  </div>
+  <!-- AppBar -->
+  <div style="background:#111827; border-bottom:1px solid #1e293b; padding:10px 14px; display:flex; align-items:center; justify-content:space-between;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#00e67620,#06b6d420); border:1.5px solid #00e67650; display:flex; align-items:center; justify-content:center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2a5 5 0 0 0-5 5v7a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7a5 5 0 0 0-5-5zM9 16v2m6-2v2M5.5 20a8 8 0 0 1 13 0"/></svg>
       </div>
-      <span class="text-xs text-slate-400 font-mono">100% Offline Mesh Mode</span>
+      <div>
+        <div style="font-size:15px; font-weight:900; letter-spacing:1px; color:#fff;">OFFMAS</div>
+        <div style="font-size:9px; font-weight:700; letter-spacing:2px; color:#00e676;">MESH NETWORK</div>
+      </div>
     </div>
-
-    <!-- Phone Shell -->
-    <div class="w-full bg-[#0b0f19] border-4 border-slate-800 rounded-[40px] shadow-2xl shadow-emerald-950/20 overflow-hidden flex flex-col h-[740px] relative">
-      
-      <!-- Top Speaker / Camera Notch -->
-      <div class="w-full h-6 bg-[#0b0f19] flex items-center justify-between px-7 pt-1 z-30">
-        <span class="text-[12px] font-semibold text-slate-400" id="liveClock">13:30</span>
-        <div class="w-16 h-3.5 bg-slate-900 rounded-full flex items-center justify-center">
-          <div class="w-2 h-2 rounded-full bg-slate-800"></div>
-        </div>
-        <div class="flex items-center gap-1.5 text-slate-400 text-xs">
-          <span>📡 98%</span>
-          <div class="w-4 h-2.5 border border-slate-500 rounded-sm p-0.5 flex items-center">
-            <div class="w-full h-full bg-emerald-500 rounded-xs"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- App Bar -->
-      <div class="bg-[#111726] border-b border-slate-800/80 px-4 py-2.5 flex items-center justify-between z-20">
-        <div class="flex items-center gap-2.5">
-          <!-- Custom Ghost + Signal Icon -->
-          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/40 flex items-center justify-center shadow-inner">
-            <svg class="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 2a5 5 0 0 0-5 5v7a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7a5 5 0 0 0-5-5zM9 16v2m6-2v2m-9 0a8 8 0 0 1 12 0M3 20a12 12 0 0 1 18 0" />
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
-              OFFMAS
-              <span class="text-[12px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">P2P</span>
-            </h1>
-            <p class="text-[12px] text-slate-400">Off-Grid Mesh Radio</p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-1.5">
-          <button onclick="toggleSOSModal()" class="w-8 h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center transition" title="Peringatan Darurat (SOS)">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-          </button>
-          <button onclick="openSettingsModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition" title="Pengaturan Profil">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Navigation Tabs -->
-      <div class="grid grid-cols-3 bg-[#111726] border-b border-slate-800 text-xs font-semibold">
-        <button onclick="switchTab('radar')" id="tabBtnRadar" class="py-2.5 text-center flex flex-col items-center gap-1 text-emerald-400 border-b-2 border-emerald-400 transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 100-18 9 9 0 000 18zm0-4a5 5 0 100-10 5 5 0 000 10zm0-2a3 3 0 100-6 3 3 0 000 6z"/></svg>
-          <span>Radar Mesh</span>
-        </button>
-        <button onclick="switchTab('messages')" id="tabBtnMessages" class="py-2.5 text-center flex flex-col items-center gap-1 text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition relative">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-          <span>Pesan</span>
-          <span class="absolute top-1.5 right-6 w-2 h-2 rounded-full bg-emerald-500"></span>
-        </button>
-        <button onclick="switchTab('emergency')" id="tabBtnEmergency" class="py-2.5 text-center flex flex-col items-center gap-1 text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-          <span>P3K & Darurat</span>
-        </button>
-      </div>
-
-      <!-- Status Bar Strip -->
-      <div class="mx-3 mt-2.5 p-2.5 bg-[#141d30] border border-emerald-500/30 rounded-xl flex items-center justify-between shadow-sm z-10">
-        <div class="flex items-center gap-2">
-          <div class="relative w-3.5 h-3.5 flex items-center justify-center">
-            <div id="statusPulse" class="absolute w-3.5 h-3.5 rounded-full bg-emerald-500 pulse-ring"></div>
-            <div id="statusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-          </div>
-          <div>
-            <div id="statusText" class="text-xs font-semibold text-white">Radar aktif · Memindai gelombang sekitar...</div>
-            <div id="statusSub" class="text-[12px] text-emerald-400">3 node terhubung di udara (Mesh Relay)</div>
-          </div>
-        </div>
-        <button onclick="toggleService()" id="btnToggleService" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition">
-          NONAKTIFKAN
-        </button>
-      </div>
-
-      <!-- SCREEN CONTENT AREA -->
-      <div class="flex-1 overflow-y-auto relative p-3">
-
-        <!-- TAB 1: RADAR MESH -->
-        <div id="tabContentRadar" class="h-full flex flex-col">
-          <!-- Radar Canvas Area -->
-          <div class="relative w-full aspect-square max-h-[300px] mx-auto bg-[#090d16] rounded-3xl border border-emerald-500/30 overflow-hidden flex items-center justify-center shadow-2xl shadow-emerald-950/30 my-auto">
-            
-            <!-- Tactical Compass Cardinal Markers -->
-            <span class="absolute top-2.5 text-[10px] font-mono font-bold text-emerald-400">N</span>
-            <span class="absolute bottom-2 text-[10px] font-mono text-slate-500">S</span>
-            <span class="absolute right-2.5 text-[10px] font-mono text-slate-500">E</span>
-            <span class="absolute left-2.5 text-[10px] font-mono text-slate-500">W</span>
-
-            <!-- Tactical Diagonal Guides -->
-            <div class="absolute w-[85%] h-[1px] bg-emerald-500/10 rotate-45"></div>
-            <div class="absolute w-[85%] h-[1px] bg-emerald-500/10 -rotate-45"></div>
-
-            <!-- Concentric Grid Circles & Distance Markers -->
-            <div class="absolute w-[82%] h-[82%] rounded-full border border-emerald-500/20 flex items-start justify-center pt-0.5">
-              <span class="text-[9px] font-mono text-emerald-500/40">100m</span>
-            </div>
-            <div class="absolute w-[56%] h-[56%] rounded-full border border-emerald-500/25 flex items-start justify-center pt-0.5">
-              <span class="text-[9px] font-mono text-emerald-500/40">50m</span>
-            </div>
-            <div class="absolute w-[30%] h-[30%] rounded-full border border-emerald-500/35 flex items-start justify-center pt-0.5">
-              <span class="text-[9px] font-mono text-emerald-500/50">25m</span>
-            </div>
-            <div class="absolute w-full h-[1px] bg-emerald-500/15"></div>
-            <div class="absolute h-full w-[1px] bg-emerald-500/15"></div>
-
-            <!-- Rotating Radar Sweep Line -->
-            <div class="absolute w-full h-full radar-sweep pointer-events-none">
-              <div class="w-1/2 h-1/2 bg-gradient-to-tr from-emerald-500/40 via-emerald-500/10 to-transparent origin-bottom-right rounded-tl-full"></div>
-            </div>
-
-            <!-- Center Self Node -->
-            <div class="relative z-10 w-9 h-9 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-lg shadow-emerald-500/60 ring-4 ring-emerald-500/20">
-              <span class="text-[11px] font-black text-slate-950 font-mono">YOU</span>
-            </div>
-
-            <!-- Discovered Peer Nodes -->
-            <!-- Peer 1: Alpha (Medis) -->
-            <div onclick="showPeerDetail('Alpha-Node', 'Tim Medis Reaksi Cepat', 'Medis', '94% • 15m', 'node_a194')" 
-                 class="absolute top-[28%] left-[24%] cursor-pointer group z-20 flex flex-col items-center">
-              <div class="w-7 h-7 rounded-full bg-emerald-950/80 border-2 border-emerald-400 flex items-center justify-center ping-slow group-hover:scale-125 transition">
-                <span class="text-xs">⚕️</span>
-              </div>
-              <span class="text-[12px] font-semibold text-emerald-300 bg-slate-950/80 px-1 rounded mt-0.5 whitespace-nowrap">Alpha (15m)</span>
-            </div>
-
-            <!-- Peer 2: Bravo (SAR) -->
-            <div onclick="showPeerDetail('Bravo-02', 'Koordinator Evakuasi Lapangan', 'SAR', '81% • 45m', 'node_b782')" 
-                 class="absolute bottom-[25%] right-[22%] cursor-pointer group z-20 flex flex-col items-center">
-              <div class="w-7 h-7 rounded-full bg-sky-950/80 border-2 border-sky-400 flex items-center justify-center ping-slow group-hover:scale-125 transition">
-                <span class="text-xs">🧗</span>
-              </div>
-              <span class="text-[12px] font-semibold text-sky-300 bg-slate-950/80 px-1 rounded mt-0.5 whitespace-nowrap">Bravo (45m)</span>
-            </div>
-
-            <!-- Peer 3: Delta (Warga) -->
-            <div onclick="showPeerDetail('Delta-Warga', 'Warga Dusun 3 Siaga', 'Umum', '65% • 80m', 'node_d411')" 
-                 class="absolute top-[22%] right-[28%] cursor-pointer group z-20 flex flex-col items-center">
-              <div class="w-7 h-7 rounded-full bg-amber-950/80 border-2 border-amber-400 flex items-center justify-center ping-slow group-hover:scale-125 transition">
-                <span class="text-xs">⛺</span>
-              </div>
-              <span class="text-[12px] font-semibold text-amber-300 bg-slate-950/80 px-1 rounded mt-0.5 whitespace-nowrap">Delta (80m)</span>
-            </div>
-
-          </div>
-
-          <!-- Radar Bottom Hint -->
-          <div class="mt-3 bg-[#111726] border border-slate-800 rounded-xl p-3 flex items-center justify-between">
-            <div>
-              <p class="text-xs font-semibold text-slate-200">Ketuk titik node pada radar</p>
-              <p class="text-[12px] text-slate-400">Untuk melihat profil, simpan kontak, atau chat.</p>
-            </div>
-            <button onclick="openCreateGroupModal()" class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
-              <span>+ Buat Grup</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- TAB 2: PESAN & CHAT LIST -->
-        <div id="tabContentMessages" class="hidden h-full flex flex-col">
-          <!-- Search & Filter -->
-          <div class="flex items-center gap-2 mb-2.5">
-            <input type="text" placeholder="Cari percakapan..." class="flex-1 bg-[#12192b] border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
-            <button onclick="openCreateGroupModal()" class="p-2 bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs hover:bg-emerald-400 transition" title="Grup Baru">
-              + Grup
-            </button>
-          </div>
-
-          <!-- Conversation List -->
-          <div class="flex-1 overflow-y-auto space-y-2">
-            
-            <!-- Group Item -->
-            <div onclick="openChat('Tim Evakuasi Posko Utama', true, 'Grup • 4 Anggota', '⚕️')" 
-                 class="p-2.5 bg-[#12192b] hover:bg-[#162035] border border-emerald-500/20 rounded-xl cursor-pointer transition flex items-center justify-between">
-              <div class="flex items-center gap-2.5">
-                <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-lg">
-                  🏕️
-                </div>
-                <div>
-                  <div class="flex items-center gap-1.5">
-                    <span class="text-xs font-bold text-white">Posko Evakuasi Utama</span>
-                    <span class="text-[12px] px-1 py-0.2 bg-emerald-500/20 text-emerald-400 rounded">GRUP</span>
-                  </div>
-                  <p class="text-[12px] text-slate-400 truncate max-w-[180px]">Alpha: Jalur barat sudah aman untuk evakuasi</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <span class="text-[12px] text-slate-400">13:28</span>
-                <div class="flex items-center justify-end text-[12px] text-cyan-400 mt-1">✓✓</div>
-              </div>
-            </div>
-
-            <!-- Direct Peer 1 -->
-            <div onclick="openChat('Alpha-Node', false, 'Medis • Sinyal 94%', '⚕️')" 
-                 class="p-2.5 bg-[#12192b] hover:bg-[#162035] border border-slate-800/80 rounded-xl cursor-pointer transition flex items-center justify-between">
-              <div class="flex items-center gap-2.5">
-                <div class="w-10 h-10 rounded-xl bg-emerald-950 border border-emerald-500/50 flex items-center justify-center text-lg">
-                  ⚕️
-                </div>
-                <div>
-                  <div class="flex items-center gap-1">
-                    <span class="text-xs font-bold text-white">Alpha-Node</span>
-                    <span class="text-[12px] text-emerald-400">★ Tersimpan</span>
-                  </div>
-                  <p class="text-[12px] text-slate-400 truncate max-w-[180px]">Obat antiseptik dan perban siap dibawa.</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <span class="text-[12px] text-slate-400">13:24</span>
-                <div class="flex items-center justify-end text-[12px] text-cyan-400 mt-1">✓✓</div>
-              </div>
-            </div>
-
-            <!-- Direct Peer 2 -->
-            <div onclick="openChat('Bravo-02', false, 'SAR • Sinyal 81%', '🧗')" 
-                 class="p-2.5 bg-[#12192b] hover:bg-[#162035] border border-slate-800/80 rounded-xl cursor-pointer transition flex items-center justify-between">
-              <div class="flex items-center gap-2.5">
-                <div class="w-10 h-10 rounded-xl bg-sky-950 border border-sky-500/50 flex items-center justify-center text-lg">
-                  🧗
-                </div>
-                <div>
-                  <span class="text-xs font-bold text-white">Bravo-02 (SAR)</span>
-                  <p class="text-[12px] text-slate-400 truncate max-w-[180px]">Koordinat genset darurat di balai warga.</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <span class="text-[12px] text-slate-400">12:50</span>
-                <div class="flex items-center justify-end text-[12px] text-slate-400 mt-1">✓✓</div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- TAB 3: P3K & DARURAT -->
-        <div id="tabContentEmergency" class="hidden h-full flex flex-col space-y-3">
-          <!-- SOS Large Button -->
-          <div class="p-4 bg-gradient-to-r from-rose-950/60 to-red-950/30 border border-rose-500/40 rounded-2xl flex items-center justify-between">
-            <div>
-              <h2 class="text-sm font-bold text-rose-300 flex items-center gap-1.5">
-                <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                SINYAL DARURAT (SOS)
-              </h2>
-              <p class="text-[12px] text-slate-300 mt-0.5">Kirim siaran prioritas darurat ke semua node mesh.</p>
-            </div>
-            <button onclick="triggerSOSAlert()" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-rose-950/50 transition">
-              SIARKAN
-            </button>
-          </div>
-
-          <!-- Quick Guides Grid -->
-          <div class="text-xs font-bold text-slate-300 uppercase tracking-wider">PANDUAN MEDIS OFFLINE (TRIAGE)</div>
-          <div class="grid grid-cols-2 gap-2 flex-1">
-            <div onclick="showEmergencyGuide('Pendarahan Luar', 'Tekan luka langsung dengan kain bersih. Jangan lepas perban pertama jika tembus darah, lapis dengan perban kedua.')" class="p-3 bg-[#12192b] border border-slate-800 rounded-xl cursor-pointer hover:border-emerald-500/40 transition">
-              <span class="text-xl">🩸</span>
-              <h3 class="text-xs font-bold text-white mt-1">Pendarahan</h3>
-              <p class="text-[12px] text-slate-400 mt-0.5">Penanganan luka sayat & kompresi</p>
-            </div>
-            <div onclick="showEmergencyGuide('Patah Tulang', 'Jangan gerakan bagian patah. Pasang bidai kayu dengan ikat kain di atas dan bawah sendi.')" class="p-3 bg-[#12192b] border border-slate-800 rounded-xl cursor-pointer hover:border-emerald-500/40 transition">
-              <span class="text-xl">🦴</span>
-              <h3 class="text-xs font-bold text-white mt-1">Patah Tulang</h3>
-              <p class="text-[12px] text-slate-400 mt-0.5">Stabilisasi & pemasangan bidai</p>
-            </div>
-            <div onclick="showEmergencyGuide('Hipotermia', 'Ganti pakaian basah dengan pakaian kering tebal. Berikan minuman hangat manis, jangan langsung mandi air panas.')" class="p-3 bg-[#12192b] border border-slate-800 rounded-xl cursor-pointer hover:border-emerald-500/40 transition">
-              <span class="text-xl">🥶</span>
-              <h3 class="text-xs font-bold text-white mt-1">Hipotermia</h3>
-              <p class="text-[12px] text-slate-400 mt-0.5">Penghangatan bertahap tubuh</p>
-            </div>
-            <div onclick="showEmergencyGuide('Luka Bakar', 'Siram dengan air mengalir suhu normal selama 15 menit. Jangan gunakan odol/mentega, tutup kain lembab steril.')" class="p-3 bg-[#12192b] border border-slate-800 rounded-xl cursor-pointer hover:border-emerald-500/40 transition">
-              <span class="text-xl">🔥</span>
-              <h3 class="text-xs font-bold text-white mt-1">Luka Bakar</h3>
-              <p class="text-[12px] text-slate-400 mt-0.5">Irigasi air & pelindung luka</p>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- FULL CHAT SCREEN OVERLAY (P2P CHAT ENGINE) -->
-      <div id="chatViewOverlay" class="absolute inset-0 bg-[#0b0f19] z-40 hidden flex flex-col">
-        <!-- Chat Header -->
-        <div class="bg-[#111726] border-b border-slate-800 px-3 py-2.5 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <button onclick="closeChat()" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            </button>
-            <div id="chatAvatar" class="w-8 h-8 rounded-full bg-emerald-950 border border-emerald-400/50 flex items-center justify-center text-sm">⚕️</div>
-            <div>
-              <div id="chatTitle" class="text-xs font-bold text-white">Alpha-Node</div>
-              <div id="chatSub" class="text-[12px] text-emerald-400">Tersambung via Radio P2P</div>
-            </div>
-          </div>
-          <div class="text-[12px] font-mono text-emerald-400 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 rounded">
-            E2EE
-          </div>
-        </div>
-
-        <!-- Date Divider -->
-        <div class="text-center py-2">
-          <span class="text-[12px] font-semibold text-slate-400 bg-slate-900/90 border border-slate-800 px-3 py-0.5 rounded-full">
-            Hari Ini • Selasa, 10 November 2026
-          </span>
-        </div>
-
-        <!-- Chat Messages Scroll Area -->
-        <div id="chatMessagesBox" class="flex-1 overflow-y-auto p-3 space-y-2.5">
-          <!-- Incoming Bubble -->
-          <div class="flex flex-col items-start max-w-[85%]">
-            <span class="text-[12px] text-slate-400 mb-0.5 px-1 font-semibold" id="chatSenderName">Alpha-Node</span>
-            <div class="bg-[#162035] border border-slate-800 text-slate-200 text-xs px-3 py-2 rounded-2xl rounded-tl-sm shadow-sm">
-              Kami membawa 2 tabung oksigen dan obat pereda nyeri ke tenda darurat.
-              <div class="text-[12px] text-slate-400 text-right mt-1">13:20</div>
-            </div>
-          </div>
-
-          <!-- Outgoing Bubble (Sent & Read) -->
-          <div class="flex flex-col items-end self-end max-w-[85%] ml-auto">
-            <div class="bg-emerald-600 text-white text-xs px-3 py-2 rounded-2xl rounded-tr-sm shadow-sm">
-              Siap, koordinasi dengan tim SAR sudah kami teruskan via mesh radio.
-              <div class="flex items-center justify-end gap-1 text-[12px] text-emerald-200 mt-1">
-                <span>13:22</span>
-                <span class="text-cyan-200 font-bold">✓✓</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Chat Input Bar -->
-        <div class="p-2.5 bg-[#111726] border-t border-slate-800 flex items-center gap-2">
-          <input type="text" id="chatInput" placeholder="Ketik pesan offline..." onkeydown="if(event.key==='Enter') sendChatMessage()"
-                 class="flex-1 bg-[#162035] border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500">
-          <button onclick="sendChatMessage()" class="p-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- PEER DETAIL BOTTOM SHEET -->
-      <div id="peerSheet" class="absolute inset-x-0 bottom-0 bg-[#12192b] border-t border-slate-700 rounded-t-3xl p-4 transform translate-y-full transition-transform duration-300 z-50">
-        <div class="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-3"></div>
-        <div class="flex items-start justify-between">
-          <div class="flex items-center gap-3">
-            <div id="sheetAvatar" class="w-12 h-12 rounded-2xl bg-emerald-950 border border-emerald-400 flex items-center justify-center text-2xl">⚕️</div>
-            <div>
-              <h2 id="sheetName" class="text-sm font-bold text-white">Alpha-Node</h2>
-              <span id="sheetRole" class="text-[12px] font-semibold text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">Medis</span>
-            </div>
-          </div>
-          <button onclick="closePeerDetail()" class="text-slate-400 hover:text-white text-lg">✕</button>
-        </div>
-
-        <div class="mt-3 bg-[#0d1322] p-2.5 rounded-xl border border-slate-800 text-xs">
-          <div class="text-slate-400 text-[12px]">Status / Bio Pengguna:</div>
-          <p id="sheetBio" class="text-slate-200 font-semibold mt-0.5">Tim Medis Reaksi Cepat</p>
-          <div class="flex items-center justify-between text-[12px] text-slate-400 mt-2 pt-2 border-t border-slate-800/80">
-            <span>Kekuatan Sinyal: <b id="sheetSignal" class="text-emerald-400">94% (15m)</b></span>
-            <span>Node ID: <b id="sheetNodeId" class="text-slate-300 font-mono">node_a194</b></span>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2 mt-3">
-          <button onclick="toggleSavePeerContact()" id="btnSaveContact" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition">
-            <span>⭐ Simpan Kontak</span>
-          </button>
-          <button onclick="startChatFromSheet()" class="py-2 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition">
-            <span>💬 Buka Chat</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- SETTINGS MODAL -->
-      <div id="settingsModal" class="absolute inset-0 bg-[#0b0f19]/95 z-50 hidden p-4 flex flex-col">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
-          <h2 class="text-sm font-bold text-white flex items-center gap-2">
-            <span>⚙️</span> Pengaturan Profil Node
-          </h2>
-          <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white">✕</button>
-        </div>
-
-        <div class="flex-1 overflow-y-auto py-3 space-y-3 text-xs">
-          <div>
-            <label class="text-[12px] font-semibold text-slate-400 block mb-1">Nama Tampilan:</label>
-            <input type="text" id="settingName" value="OFFMAS-User" class="w-full bg-[#141d30] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
-          </div>
-
-          <div>
-            <label class="text-[12px] font-semibold text-slate-400 block mb-1">Peran Taktis (Role):</label>
-            <div class="grid grid-cols-3 gap-1.5">
-              <button onclick="selectRole('Umum')" class="role-btn py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500 text-emerald-300 font-semibold text-[12px]">Umum</button>
-              <button onclick="selectRole('Medis')" class="role-btn py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[12px]">Medis</button>
-              <button onclick="selectRole('SAR')" class="role-btn py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[12px]">SAR</button>
-              <button onclick="selectRole('Logistik')" class="role-btn py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[12px]">Logistik</button>
-              <button onclick="selectRole('Keamanan')" class="role-btn py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[12px]">Keamanan</button>
-            </div>
-          </div>
-
-          <div>
-            <label class="text-[12px] font-semibold text-slate-400 block mb-1">Bio / Status Darurat:</label>
-            <input type="text" id="settingBio" value="Siaga Offline • Baterai 98%" class="w-full bg-[#141d30] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
-          </div>
-
-          <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-            <span class="text-[12px] text-slate-400 block">Kunci Kriptografi Node (E2EE):</span>
-            <div class="font-mono text-[12px] text-emerald-400 mt-1 break-all">
-              ed25519:7f89b...3c21a (Terverifikasi Aman)
-            </div>
-          </div>
-        </div>
-
-        <button onclick="saveProfileSettings()" class="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition">
-          Simpan Profil
-        </button>
-      </div>
-
+    <div style="display:flex; gap:4px;">
+      <button onclick="showNotifDemo()" style="background:none; border:none; color:#06b6d4; font-size:18px; cursor:pointer; padding:4px;" title="Simulasi notif background">⚕️</button>
+      <button style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; padding:4px;">⚙️</button>
     </div>
-
-    <!-- Simulator Controller Hints -->
-    <div class="w-full mt-3 px-3 py-2 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between text-xs text-slate-400">
-      <span>💡 <b>Tips Uji Coba:</b> Ketuk radar untuk hubungi peer, atau kirim chat untuk uji centang dibaca (✓✓).</span>
-      <span class="text-emerald-400 font-mono text-[12px]">v1.1.0 Ready</span>
-    </div>
-
+  </div>
+  <!-- Tabs -->
+  <div style="background:#111827; border-bottom:1px solid #1e293b; display:flex;">
+    <button class="tab-btn active" id="tab-radar" onclick="switchTab('radar')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v10l6 4"/><circle cx="12" cy="12" r="3"/></svg>
+      <span>Radar Mesh</span>
+    </button>
+    <button class="tab-btn" id="tab-pesan" onclick="switchTab('pesan')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Pesan</span>
+    </button>
+    <button class="tab-btn" id="tab-p3k" onclick="switchTab('p3k')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-3-3v6m9-6a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+      <span>P3K & Darurat</span>
+    </button>
+  </div>
+  <div style="height:2px; background:#1e293b; position:relative;">
+    <div style="position:absolute; height:100%; background:#00e676; transition:all 0.3s; border-radius:2px; left:0; width:33.33%;" id="tabLine"></div>
+  </div>
+  <!-- Status bar -->
+  <div style="display:flex; align-items:center; gap:8px; padding:10px 16px; border-bottom:1px solid #1e293b;">
+    <div class="blink" id="statusDot" style="width:8px; height:8px; border-radius:50%; background:#00e676; flex-shrink:0;"></div>
+    <span style="font-size:12px; color:#94a3b8; flex:1;" id="statusText">Radar aktif · Memindai gelombang sekitar...</span>
+    <button onclick="toggleRadar()" id="radarBtn" style="background:#0d2a1a; border:1px solid #00e676; color:#00e676; border-radius:8px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap;">NONAKTIF</button>
   </div>
 
-  <!-- SCRIPT LOGIC FOR SIMULATOR -->
-  <script>
-    let isServiceActive = true;
-    let currentPeer = null;
-
-    // Clock updater
-    function updateClock() {
-      const now = new Date();
-      document.getElementById('liveClock').textContent = 
-        String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    // Tab Switching
-    function switchTab(tab) {
-      document.getElementById('tabContentRadar').classList.add('hidden');
-      document.getElementById('tabContentMessages').classList.add('hidden');
-      document.getElementById('tabContentEmergency').classList.add('hidden');
-
-      document.getElementById('tabBtnRadar').className = "py-2.5 text-center flex flex-col items-center gap-1 text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition";
-      document.getElementById('tabBtnMessages').className = "py-2.5 text-center flex flex-col items-center gap-1 text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition relative";
-      document.getElementById('tabBtnEmergency').className = "py-2.5 text-center flex flex-col items-center gap-1 text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition";
-
-      if (tab === 'radar') {
-        document.getElementById('tabContentRadar').classList.remove('hidden');
-        document.getElementById('tabBtnRadar').className = "py-2.5 text-center flex flex-col items-center gap-1 text-emerald-400 border-b-2 border-emerald-400 transition";
-      } else if (tab === 'messages') {
-        document.getElementById('tabContentMessages').classList.remove('hidden');
-        document.getElementById('tabBtnMessages').className = "py-2.5 text-center flex flex-col items-center gap-1 text-emerald-400 border-b-2 border-emerald-400 transition relative";
-      } else if (tab === 'emergency') {
-        document.getElementById('tabContentEmergency').classList.remove('hidden');
-        document.getElementById('tabBtnEmergency').className = "py-2.5 text-center flex flex-col items-center gap-1 text-rose-400 border-b-2 border-rose-400 transition";
-      }
-    }
-
-    // Toggle Service
-    function toggleService() {
-      isServiceActive = !isServiceActive;
-      const btn = document.getElementById('btnToggleService');
-      const text = document.getElementById('statusText');
-      const sub = document.getElementById('statusSub');
-      const pulse = document.getElementById('statusPulse');
-      const dot = document.getElementById('statusDot');
-
-      if (isServiceActive) {
-        btn.textContent = 'NONAKTIFKAN';
-        btn.className = 'px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition';
-        text.textContent = 'Radar aktif · Memindai gelombang sekitar...';
-        sub.textContent = '3 node terhubung di udara (Mesh Relay)';
-        pulse.classList.remove('hidden');
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
-      } else {
-        btn.textContent = 'AKTIFKAN';
-        btn.className = 'px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-bold uppercase tracking-wider transition';
-        text.textContent = 'Radar radio tidak aktif';
-        sub.textContent = 'Tekan AKTIFKAN untuk menyalakan mesh';
-        pulse.classList.add('hidden');
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-600';
-      }
-    }
-
-    // Peer Sheet Logic
-    function showPeerDetail(name, bio, role, signal, nodeId) {
-      currentPeer = { name, bio, role, signal, nodeId };
-      document.getElementById('sheetName').textContent = name;
-      document.getElementById('sheetBio').textContent = bio;
-      document.getElementById('sheetRole').textContent = role;
-      document.getElementById('sheetSignal').textContent = signal;
-      document.getElementById('sheetNodeId').textContent = nodeId;
-      document.getElementById('peerSheet').classList.remove('translate-y-full');
-    }
-
-    function closePeerDetail() {
-      document.getElementById('peerSheet').classList.add('translate-y-full');
-    }
-
-    function toggleSavePeerContact() {
-      const btn = document.getElementById('btnSaveContact');
-      btn.innerHTML = '<span>✅ Kontak Tersimpan</span>';
-      btn.classList.add('text-emerald-400', 'border', 'border-emerald-500/40');
-      setTimeout(closePeerDetail, 700);
-    }
-
-    function startChatFromSheet() {
-      closePeerDetail();
-      openChat(currentPeer.name, false, currentPeer.role + ' • ' + currentPeer.signal, '⚕️');
-    }
-
-    // Chat Overlay Logic
-    function openChat(title, isGroup, sub, avatar) {
-      document.getElementById('chatTitle').textContent = title;
-      document.getElementById('chatSub').textContent = isGroup ? sub : 'Tersambung via Radio P2P (' + sub + ')';
-      document.getElementById('chatSenderName').textContent = isGroup ? 'Alpha (Tim Medis)' : title;
-      document.getElementById('chatAvatar').textContent = avatar;
-      document.getElementById('chatViewOverlay').classList.remove('hidden');
-    }
-
-    function closeChat() {
-      document.getElementById('chatViewOverlay').classList.add('hidden');
-    }
-
-    function sendChatMessage() {
-      const input = document.getElementById('chatInput');
-      const text = input.value.trim();
-      if (!text) return;
-
-      const box = document.getElementById('chatMessagesBox');
-      const now = new Date();
-      const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-      const msgId = 'msg_' + Date.now();
-
-      // Create outgoing message bubble with initial SENT tick (single grey check)
-      const bubble = document.createElement('div');
-      bubble.className = "flex flex-col items-end self-end max-w-[85%] ml-auto";
-      bubble.innerHTML = `
-        <div class="bg-emerald-600 text-white text-xs px-3 py-2 rounded-2xl rounded-tr-sm shadow-sm">
-          ${escapeHtml(text)}
-          <div class="flex items-center justify-end gap-1 text-[12px] text-emerald-200 mt-1">
-            <span>${timeStr}</span>
-            <span id="${msgId}_tick" class="text-slate-300 font-bold">✓</span>
+  <!-- CONTENT AREA -->
+  <div style="flex:1; overflow:hidden; position:relative;" id="contentArea">
+    <!-- TAB: RADAR -->
+    <div class="tab-content active" id="content-radar">
+      <div style="display:flex; flex-direction:column; align-items:center; padding:10px 0 6px;">
+        <div style="position:relative; width:220px; height:220px;">
+          <div style="position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle, #0d2a1a 0%, #0a1628 60%, #060b14 100%); border:1.5px solid #00e67640;"></div>
+          <div style="position:absolute; inset:15%; border-radius:50%; border:1px solid #00e67618;"></div>
+          <div style="position:absolute; inset:30%; border-radius:50%; border:1px solid #00e67618;"></div>
+          <div style="position:absolute; inset:45%; border-radius:50%; border:1px solid #00e67618;"></div>
+          <span style="position:absolute; top:4px; left:50%; transform:translateX(-50%); font-size:9px; color:#00e67660; font-weight:700;">N</span>
+          <span style="position:absolute; bottom:4px; left:50%; transform:translateX(-50%); font-size:9px; color:#00e67660; font-weight:700;">S</span>
+          <span style="position:absolute; left:4px; top:50%; transform:translateY(-50%); font-size:9px; color:#00e67660; font-weight:700;">W</span>
+          <span style="position:absolute; right:4px; top:50%; transform:translateY(-50%); font-size:9px; color:#00e67660; font-weight:700;">E</span>
+          <svg style="position:absolute; inset:0; width:100%; height:100%;" viewBox="0 0 220 220" class="radar-sweep">
+            <defs><linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00e676" stop-opacity="0"/><stop offset="100%" stop-color="#00e676" stop-opacity="0.35"/></linearGradient></defs>
+            <path d="M110,110 L110,10 A100,100,0,0,1,210,110 Z" fill="url(#sweep)"/>
+            <line x1="110" y1="110" x2="110" y2="8" stroke="#00e676" stroke-width="1.5" stroke-opacity="0.6"/>
+          </svg>
+          <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:12px; height:12px; border-radius:50%; background:#00e676; box-shadow:0 0 10px #00e676;"></div>
+          <div class="peer-dot" onclick="showPeerSheet('Ghost-A4F2','Anggota Tim','connected')" style="position:absolute; left:62%; top:28%; width:12px; height:12px; border-radius:50%; background:#00e676; cursor:pointer; box-shadow:0 0 8px #00e676;"></div>
+          <div class="peer-dot" onclick="showPeerSheet('Shadow-7E91','Relawan','found')" style="position:absolute; left:28%; top:55%; width:10px; height:10px; border-radius:50%; background:#06b6d4; cursor:pointer; animation-delay:0.5s; box-shadow:0 0 8px #06b6d4;"></div>
+          <div style="position:absolute; left:70%; top:65%; width:8px; height:8px; border-radius:50%; background:#fbbf24; opacity:0.7;"></div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <span style="font-size:10px; color:#00e676;">● Terhubung (1)</span>
+          <span style="font-size:10px; color:#06b6d4;">● Terdeteksi (2)</span>
+          <span style="font-size:10px; color:#fbbf24;">● Jauh (1)</span>
+        </div>
+      </div>
+      <div style="padding:0 2px;">
+        <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px;">PERANGKAT TERDETEKSI</div>
+        <div class="peer-card" onclick="showPeerSheet('Ghost-A4F2','Anggota Tim','connected')">
+          <div class="peer-avatar" style="background:#00e67620; border:1.5px solid #00e676; color:#00e676;">👻</div>
+          <div style="flex:1;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-weight:700; font-size:14px; color:#fff;">Ghost-A4F2</span>
+              <span class="badge" style="background:#00e67615; color:#00e676; border:1px solid #00e67640;">Anggota Tim</span>
+            </div>
+            <div style="font-size:11px; color:#64748b; margin-top:2px;">Node Anonim Terenkripsi · 2 hop</div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+            <div class="blink" style="width:8px; height:8px; border-radius:50%; background:#00e676;"></div>
+            <span style="font-size:10px; color:#00e676; font-weight:700;">TERHUBUNG</span>
           </div>
         </div>
-      `;
-      box.appendChild(bubble);
-      input.value = '';
-      box.scrollTop = box.scrollHeight;
-
-      // Simulate Real-time Read Receipts via P2P ACK
-      // 1. DELIVERED TICK (Double Grey) after 600ms
-      setTimeout(() => {
-        const tick = document.getElementById(msgId + '_tick');
-        if (tick) {
-          tick.textContent = '✓✓';
-          tick.className = 'text-slate-300 font-bold';
-        }
-      }, 600);
-
-      // 2. READ TICK (Double Cyan / Blue) after 1400ms
-      setTimeout(() => {
-        const tick = document.getElementById(msgId + '_tick');
-        if (tick) {
-          tick.textContent = '✓✓';
-          tick.className = 'text-cyan-200 font-bold';
-        }
-      }, 1400);
-
-      // 3. Simulated Response from peer after 2.5s
-      setTimeout(() => {
-        const reply = document.createElement('div');
-        reply.className = "flex flex-col items-start max-w-[85%]";
-        reply.innerHTML = `
-          <span class="text-[12px] text-slate-400 mb-0.5 px-1 font-semibold">${document.getElementById('chatTitle').textContent}</span>
-          <div class="bg-[#162035] border border-slate-800 text-slate-200 text-xs px-3 py-2 rounded-2xl rounded-tl-sm shadow-sm">
-            Pesan diterima melalui relai mesh: "${escapeHtml(text)}". Tetap di frekuensi siaga!
-            <div class="text-[12px] text-slate-400 text-right mt-1">${timeStr}</div>
+        <div class="peer-card" onclick="showPeerSheet('Shadow-7E91','Relawan','found')">
+          <div class="peer-avatar" style="background:#06b6d420; border:1.5px solid #06b6d4; color:#06b6d4;">🕵️</div>
+          <div style="flex:1;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-weight:700; font-size:14px; color:#fff;">Shadow-7E91</span>
+              <span class="badge" style="background:#06b6d415; color:#06b6d4; border:1px solid #06b6d440;">Relawan</span>
+            </div>
+            <div style="font-size:11px; color:#64748b; margin-top:2px;">Siaga Offline · Sinyal kuat</div>
           </div>
-        `;
-        box.appendChild(reply);
-        box.scrollTop = box.scrollHeight;
-      }, 2500);
-    }
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+            <div style="width:8px; height:8px; border-radius:50%; background:#06b6d4;"></div>
+            <span style="font-size:10px; color:#06b6d4; font-weight:700;">TERDETEKSI</span>
+          </div>
+        </div>
+        <div class="peer-card" style="opacity:0.6;">
+          <div class="peer-avatar" style="background:#fbbf2420; border:1.5px solid #fbbf24; color:#fbbf24;">🔮</div>
+          <div style="flex:1;">
+            <div style="font-weight:700; font-size:14px; color:#fff;">Phantom-3B2D</div>
+            <div style="font-size:11px; color:#64748b; margin-top:2px;">Sinyal lemah · 85m</div>
+          </div>
+          <span style="font-size:10px; color:#fbbf24; font-weight:700;">JAUH</span>
+        </div>
+      </div>
+    </div>
 
-    function escapeHtml(str) {
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
+    <!-- TAB: PESAN -->
+    <div class="tab-content" id="content-pesan">
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        <input type="text" placeholder="🔍  Cari percakapan..." style="flex:1; background:#111827; border:1px solid #1e293b; border-radius:10px; padding:8px 12px; color:#fff; font-size:12px; outline:none;">
+        <button style="background:#06b6d420; border:1px solid #06b6d450; border-radius:10px; padding:8px 10px; color:#06b6d4; font-size:18px; cursor:pointer;">👥</button>
+      </div>
+      <div class="peer-card" onclick="openChat('Ghost-A4F2')">
+        <div class="peer-avatar" style="background:#00e67620; border:1.5px solid #00e676; color:#00e676; font-size:14px;">👻</div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:700; font-size:13px; color:#fff;">Ghost-A4F2</span><span style="font-size:10px; color:#64748b;">10:09</span></div>
+          <div style="font-size:11px; color:#64748b; margin-top:2px; display:flex; justify-content:space-between; align-items:center;"><span>✓✓ Pesan terkirim ke mesh...</span><span style="background:#00e676; color:#000; border-radius:999px; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:900;">2</span></div>
+        </div>
+      </div>
+      <div class="peer-card" onclick="openChat('Shadow-7E91')" style="opacity:0.8;">
+        <div class="peer-avatar" style="background:#06b6d420; border:1.5px solid #06b6d4; color:#06b6d4; font-size:14px;">🕵️</div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:700; font-size:13px; color:#fff;">Shadow-7E91</span><span style="font-size:10px; color:#64748b;">09:44</span></div>
+          <div style="font-size:11px; color:#64748b; margin-top:2px;">Terhubung secara offline</div>
+        </div>
+      </div>
+      <div class="peer-card" style="opacity:0.8; border-left:3px solid #fbbf24;">
+        <div class="peer-avatar" style="background:#fbbf2420; border:1.5px solid #fbbf24; color:#fbbf24; font-size:14px;">👥</div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:700; font-size:13px; color:#fff;">Tim Posko Alpha</span><span style="font-size:10px; color:#64748b;">08:31</span></div>
+          <div style="font-size:11px; color:#64748b; margin-top:2px;">Ghost-A4F2: Situasi kondusif</div>
+        </div>
+      </div>
+      <div style="text-align:center; padding:20px; color:#334155; font-size:11px;">— Semua komunikasi terenkripsi E2E —</div>
+    </div>
 
-    // Modals
-    function openSettingsModal() {
-      document.getElementById('settingsModal').classList.remove('hidden');
-    }
-    function closeSettingsModal() {
-      document.getElementById('settingsModal').classList.add('hidden');
-    }
-    function selectRole(role) {
-      document.querySelectorAll('.role-btn').forEach(b => {
-        b.className = "role-btn py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[12px]";
-      });
-      event.target.className = "role-btn py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500 text-emerald-300 font-semibold text-[12px]";
-    }
-    function saveProfileSettings() {
-      closeSettingsModal();
-      alert('Profil diperbarui! Perubahan dipancarkan ke mesh.');
-    }
+    <!-- TAB: P3K -->
+    <div class="tab-content" id="content-p3k">
+      <div style="font-size:13px; font-weight:900; letter-spacing:1px; color:#ff4569; margin-bottom:12px; text-transform:uppercase;">📋 Panduan P3K & Darurat</div>
+      <div class="peer-card" style="border-left:3px solid #ff4569;"><span style="font-size:22px;">🩺</span><div><div style="font-weight:700; color:#fff;">Henti Jantung (CPR)</div><div style="font-size:11px; color:#64748b;">30:2 kompresi-napas · 100-120/mnt</div></div></div>
+      <div class="peer-card" style="border-left:3px solid #fbbf24;"><span style="font-size:22px;">🩸</span><div><div style="font-weight:700; color:#fff;">Perdarahan Parah</div><div style="font-size:11px; color:#64748b;">Tekan langsung · torniket jika perlu</div></div></div>
+      <div class="peer-card" style="border-left:3px solid #06b6d4;"><span style="font-size:22px;">🏥</span><div><div style="font-weight:700; color:#fff;">Triase Lapangan</div><div style="font-size:11px; color:#64748b;">Merah · Kuning · Hijau · Hitam</div></div></div>
+    </div>
 
-    function toggleSOSModal() {
-      triggerSOSAlert();
-    }
-    function triggerSOSAlert() {
-      alert('🚨 PERINGATAN DARURAT (SOS) DISIARKAN!\nSemua perangkat dalam jangkauan mesh berbunyi dan menerima koordinat Anda.');
-    }
-    function showEmergencyGuide(title, desc) {
-      alert('📋 ' + title.toUpperCase() + ' (Panduan Darurat):\n\n' + desc);
-    }
-    function openCreateGroupModal() {
-      alert('👥 Buat Grup Baru:\nPilih kontak tersimpan untuk menambahkan ke grup mesh offline.');
-    }
-  </script>
+    <!-- CHAT SCREEN -->
+    <div class="screen" id="screen-chat">
+      <div style="background:#111827; border-bottom:1px solid #1e293b; padding:10px 14px; display:flex; align-items:center; gap:10px; flex-shrink:0;">
+        <button onclick="closeChat()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer;">←</button>
+        <div style="width:36px; height:36px; border-radius:50%; background:#00e67620; border:1.5px solid #00e676; display:flex; align-items:center; justify-content:center; font-size:16px;">👻</div>
+        <div style="flex:1;">
+          <div id="chatPeerName" style="font-weight:700; color:#fff; font-size:14px;">Ghost-A4F2</div>
+          <div style="font-size:10px; color:#00e676; font-weight:600; display:flex; align-items:center; gap:4px;"><div class="blink" style="width:6px; height:6px; border-radius:50%; background:#00e676;"></div>Terhubung offline · E2EE aktif</div>
+        </div>
+        <button style="background:none; border:none; color:#ff4569; font-size:16px; cursor:pointer;">🆘</button>
+      </div>
+      <div style="flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px;" id="chatMessages">
+        <div style="text-align:center; color:#334155; font-size:11px; padding:4px;">— Sesi terenkripsi dimulai —</div>
+        <div style="display:flex; flex-direction:column; gap:1px;"><div class="bubble-them">Hei Ghost! Situasi di titik B bagaimana?</div><span style="font-size:9px; color:#475569; margin-left:4px;">09:14 · 2 hop</span></div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:1px;"><div class="bubble-me">Kondisi aman. 15 orang sudah dievakuasi ke posko.</div><span style="font-size:9px; color:#475569; margin-right:4px;">09:16 · <span style="color:#06b6d4;">✓✓</span></span></div>
+        <div style="display:flex; flex-direction:column; gap:1px;"><div class="bubble-them">Butuh perbekalan medis? Kami punya stok di koordinat D7.</div><span style="font-size:9px; color:#475569; margin-left:4px;">09:19</span></div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:1px;"><div class="bubble-me">Ya, kirim 2 orang dengan kit P3K dan radio backup.</div><span style="font-size:9px; color:#475569; margin-right:4px;">09:21 · <span style="color:#00e676;">✓✓</span></span></div>
+        <div style="display:flex; flex-direction:column; gap:1px;"><div class="bubble-them" style="border-left:3px solid #fbbf24; padding-left:12px;">🆘 SOS: Ada korban luka bakar di titik C3!</div><span style="font-size:9px; color:#475569; margin-left:4px;">09:44</span></div>
+      </div>
+      <div style="background:#111827; border-top:1px solid #1e293b; padding:10px 12px; display:flex; gap:8px; align-items:flex-end; flex-shrink:0;">
+        <div style="flex:1; background:#0b0f19; border:1px solid #1e293b; border-radius:12px; padding:9px 12px; font-size:12px; color:#475569;">Pesan terenkripsi...</div>
+        <button onclick="sendDemoMsg()" style="background:#00e676; border:none; border-radius:12px; width:38px; height:38px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px; flex-shrink:0;">➤</button>
+      </div>
+    </div>
+
+    <!-- OVERLAYS -->
+    <div id="sheetOverlay" class="overlay" style="display:none;" onclick="closeSheet()"></div>
+
+    <!-- Peer Sheet -->
+    <div class="bottom-sheet" id="peerSheet" style="display:none;">
+      <div class="sheet-handle"></div>
+      <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
+        <div class="peer-avatar" id="sheetAvatar" style="width:52px; height:52px; font-size:22px; background:#00e67620; border:2px solid #00e676; color:#00e676;">👻</div>
+        <div style="flex:1;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span id="sheetName" style="font-weight:800; font-size:17px; color:#fff;">Ghost-A4F2</span>
+            <span id="sheetRole" class="badge" style="background:#00e67615; color:#00e676; border:1px solid #00e67640;">Anggota Tim</span>
+          </div>
+          <div id="sheetStatus" style="font-size:12px; color:#00e676; margin-top:3px;">🟢 Terhubung Langsung</div>
+        </div>
+      </div>
+      <div style="background:#0b0f19; border:1px solid #1e293b; border-radius:12px; padding:12px; margin-bottom:16px;">
+        <div style="font-size:10px; color:#64748b; margin-bottom:4px;">Bio & Status:</div>
+        <div style="font-size:13px; color:#e2e8f0; font-style:italic;">Node Anonim Terenkripsi</div>
+        <div id="sheetNodeId" style="font-size:10px; color:#334155; margin-top:6px; font-family:monospace;">Node: ep_ghosta4f2_mesh</div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn-outline" onclick="closeSheet()" style="flex:1;">💾 Simpan Kontak</button>
+        <button id="sheetMainBtn" onclick="sheetMainAction()" class="btn-green" style="flex:2;">💬 Buka Chat</button>
+      </div>
+    </div>
+
+    <!-- Connection Request Sheet — NEW FEATURE -->
+    <div class="bottom-sheet" id="requestSheet" style="display:none;">
+      <div class="sheet-handle"></div>
+      <div style="display:flex; flex-direction:column; align-items:center; text-align:center;">
+        <div style="position:relative; width:72px; height:72px; margin-bottom:14px;">
+          <div style="position:absolute; inset:0; border-radius:50%; background:#06b6d410; border:2px solid #06b6d450;"></div>
+          <div style="position:absolute; inset:-8px; border-radius:50%; border:1.5px solid #06b6d430; animation: pulseRing 2s infinite;"></div>
+          <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:30px;">📡</div>
+        </div>
+        <div style="font-size:11px; font-weight:900; letter-spacing:2px; color:#94a3b8; text-transform:uppercase; margin-bottom:8px;">PERMINTAAN TERHUBUNG</div>
+        <div id="reqPeerName" style="font-size:24px; font-weight:900; color:#00e676; margin-bottom:4px;">Shadow-7E91</div>
+        <div style="font-size:13px; color:#64748b; margin-bottom:12px;">ingin terhubung ke jaringan mesh Anda</div>
+        <div style="background:#0b0f19; border:1px solid #1e293b; border-radius:10px; padding:7px 14px; margin-bottom:16px; display:flex; align-items:center; gap:6px;">
+          <span style="font-size:11px; color:#475569;">🔒 Token:</span>
+          <span id="reqToken" style="font-size:11px; color:#64748b; font-family:monospace; letter-spacing:1px;">A4F2-7E91-B3C0</span>
+        </div>
+        <!-- Countdown -->
+        <div style="width:100%; margin-bottom:20px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+            <span style="font-size:10px; color:#64748b;">Auto-tolak dalam:</span>
+            <span id="countdownNum" style="font-size:10px; font-weight:700; color:#94a3b8;">30 dtk</span>
+          </div>
+          <div style="background:#1e293b; border-radius:4px; height:5px; overflow:hidden;">
+            <div id="countdownBar" class="countdown-fill" style="width:100%;"></div>
+          </div>
+        </div>
+        <!-- Buttons -->
+        <div style="display:flex; gap:10px; width:100%;">
+          <button class="btn-red" onclick="rejectRequest()" style="flex:1;">✕ TOLAK</button>
+          <button class="btn-green" onclick="acceptRequest()" style="flex:2;">✓ TERIMA</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="connectedToast" style="display:none;">
+      <div style="width:36px; height:36px; border-radius:10px; background:#00e67620; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">🟢</div>
+      <div style="flex:1;">
+        <div style="font-size:12px; font-weight:700; color:#fff;">Terhubung!</div>
+        <div style="font-size:11px; color:#64748b;" id="toastText">Ghost-A4F2 menerima koneksi Anda</div>
+      </div>
+      <button onclick="openChatFromToast()" style="background:#00e676; border:none; border-radius:8px; padding:5px 10px; color:#000; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap;">CHAT</button>
+    </div>
+
+    <!-- Background Notification Overlay -->
+    <div id="notifOverlay" style="display:none; position:absolute; inset:0; background:#0b0f19; z-index:100; flex-direction:column; justify-content:flex-start; padding:20px 16px; animation:fadeIn 0.3s;">
+      <div style="text-align:center; color:#64748b; font-size:11px; margin-bottom:30px; font-weight:600;">10:11 — 📱 Layar Terkunci</div>
+      <div style="text-align:center; font-size:36px; font-weight:900; color:#fff; margin-bottom:4px;">10:11</div>
+      <div style="text-align:center; font-size:13px; color:#64748b; margin-bottom:30px;">Kamis, 12 November 2026</div>
+      <!-- Notification card -->
+      <div style="background:#111827; border:1px solid #1e293b; border-radius:18px; padding:14px 16px; display:flex; gap:12px; align-items:flex-start; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+        <div style="width:40px; height:40px; border-radius:12px; background:#00e67620; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">📡</div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#94a3b8;">OFFMAS</div>
+              <div style="font-size:13px; font-weight:700; color:#fff; margin-top:2px;">📡 Permintaan Terhubung</div>
+              <div style="font-size:12px; color:#94a3b8; margin-top:2px;">Shadow-7E91 ingin terhubung ke jaringan Anda</div>
+            </div>
+            <span style="font-size:10px; color:#475569; white-space:nowrap;">barusan</span>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:30px;">
+        <div style="color:#334155; font-size:11px; margin-bottom:12px;">Buka aplikasi untuk Terima / Tolak</div>
+        <button onclick="hideNotif()" style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:10px 24px; color:#94a3b8; font-size:13px; cursor:pointer; font-weight:600;">← Buka OFFMAS</button>
+      </div>
+    </div>
+
+  </div><!-- end contentArea -->
+
+  <!-- SOS FAB -->
+  <button class="fab-sos" id="sosFab">🆘 SIARAN SOS</button>
+  <div style="background:#060b14; border-top:1px solid #0f172a; padding:4px 20px 8px; display:flex; justify-content:center; flex-shrink:0;">
+    <span style="font-size:9px; color:#1e293b; font-family:monospace; letter-spacing:1px;">GHOST MODE · ZERO-KNOWLEDGE · E2EE AES-GCM-256</span>
+  </div>
+</div><!-- end phone -->
+
+<div style="width:360px; margin-top:14px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
+  <span style="font-size:10px; background:#0f172a; border:1px solid #1e293b; border-radius:999px; padding:4px 10px; color:#64748b;">📡 Nearby Connections API</span>
+  <span style="font-size:10px; background:#0f172a; border:1px solid #1e293b; border-radius:999px; padding:4px 10px; color:#64748b;">🔒 AES-GCM-256 E2EE</span>
+  <span style="font-size:10px; background:#0f172a; border:1px solid #1e293b; border-radius:999px; padding:4px 10px; color:#64748b;">👻 100% Anonim</span>
+  <span style="font-size:10px; background:#0f172a; border:1px solid #1e293b; border-radius:999px; padding:4px 10px; color:#64748b;">🌐 Zero Internet</span>
+</div>
+
+<script>
+let currentTab = 'radar', radarActive = true, countdownInterval = null;
+let countdownSeconds = 30, sheetCurrentPeer = { name: '', status: '' }, toastPeer = '';
+
+function updateClock() { const n = new Date(); document.getElementById('liveClock').textContent = n.toTimeString().slice(0,5); }
+updateClock(); setInterval(updateClock, 10000);
+
+function switchTab(tab) {
+  currentTab = tab;
+  ['radar','pesan','p3k'].forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('active', t === tab);
+    document.getElementById('content-'+t).classList.toggle('active', t === tab);
+  });
+  const idx = ['radar','pesan','p3k'].indexOf(tab);
+  const line = document.getElementById('tabLine');
+  line.style.left = (idx * 33.33) + '%'; line.style.width = '33.33%';
+  document.getElementById('screen-chat').classList.remove('active');
+}
+
+function openChat(name) {
+  document.getElementById('chatPeerName').textContent = name;
+  document.getElementById('screen-chat').classList.add('active');
+  document.getElementById('sosFab').style.display = 'none';
+}
+function closeChat() {
+  document.getElementById('screen-chat').classList.remove('active');
+  document.getElementById('sosFab').style.display = '';
+}
+function sendDemoMsg() {
+  const msgs = document.getElementById('chatMessages');
+  const bubble = document.createElement('div');
+  bubble.style.cssText = 'display:flex; flex-direction:column; align-items:flex-end; gap:1px;';
+  bubble.innerHTML = `<div class="bubble-me">Diterima. Konfirmasi keselamatan tim.</div><span style="font-size:9px; color:#475569; margin-right:4px;">sekarang · ✓</span>`;
+  msgs.appendChild(bubble); msgs.scrollTop = msgs.scrollHeight;
+  setTimeout(() => { bubble.querySelector('span').innerHTML = `sekarang · <span style="color:#06b6d4;">✓✓</span>`; }, 1200);
+  setTimeout(() => { bubble.querySelector('span').innerHTML = `sekarang · <span style="color:#00e676;">✓✓</span>`; }, 2400);
+}
+
+function showPeerSheet(name, role, status) {
+  sheetCurrentPeer = { name, status };
+  document.getElementById('sheetName').textContent = name;
+  document.getElementById('sheetRole').textContent = role;
+  const isConnected = status === 'connected';
+  document.getElementById('sheetStatus').textContent = isConnected ? '🟢 Terhubung Langsung' : '🔵 Terdeteksi di Udara';
+  document.getElementById('sheetStatus').style.color = isConnected ? '#00e676' : '#06b6d4';
+  document.getElementById('sheetMainBtn').textContent = isConnected ? '💬 Buka Chat' : '🔗 Hubungkan';
+  document.getElementById('sheetNodeId').textContent = `Node: ep_${name.toLowerCase().replace('-','')}`;
+  document.getElementById('peerSheet').style.display = 'block';
+  document.getElementById('sheetOverlay').style.display = 'block';
+}
+function sheetMainAction() {
+  closeSheet();
+  if (sheetCurrentPeer.status === 'connected') {
+    openChat(sheetCurrentPeer.name);
+  } else {
+    setTimeout(() => showToast(`📡 Permintaan terhubung dikirim ke ${sheetCurrentPeer.name}...`, false), 300);
+  }
+}
+function closeSheet() {
+  document.getElementById('peerSheet').style.display = 'none';
+  document.getElementById('requestSheet').style.display = 'none';
+  document.getElementById('sheetOverlay').style.display = 'none';
+  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+}
+
+function showConnectionRequest(name) {
+  document.getElementById('reqPeerName').textContent = name || 'Shadow-7E91';
+  document.getElementById('reqToken').textContent = 'A4F2-' + Math.floor(Math.random()*9000+1000) + '-' + Math.floor(Math.random()*9000+1000);
+  document.getElementById('requestSheet').style.display = 'block';
+  document.getElementById('sheetOverlay').style.display = 'block';
+  startCountdown();
+}
+function startCountdown() {
+  countdownSeconds = 30; updateCountdownUI();
+  if (countdownInterval) clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    countdownSeconds--;
+    updateCountdownUI();
+    if (countdownSeconds <= 0) { clearInterval(countdownInterval); rejectRequest(); }
+  }, 1000);
+}
+function updateCountdownUI() {
+  const pct = (countdownSeconds / 30) * 100;
+  const bar = document.getElementById('countdownBar');
+  const num = document.getElementById('countdownNum');
+  bar.style.width = pct + '%';
+  bar.style.background = countdownSeconds < 10 ? '#ff1744' : '#06b6d4';
+  num.textContent = countdownSeconds + ' dtk';
+  num.style.color = countdownSeconds < 10 ? '#ff1744' : '#94a3b8';
+}
+function acceptRequest() {
+  const name = document.getElementById('reqPeerName').textContent;
+  closeSheet();
+  setTimeout(() => {
+    toastPeer = name;
+    const t = document.getElementById('connectedToast');
+    document.getElementById('toastText').textContent = `${name} berhasil terhubung! Ketuk CHAT untuk mulai.`;
+    t.style.display = 'flex';
+    t.style.borderColor = '#00e67650';
+    t.querySelector('button').style.display = '';
+    setTimeout(() => { t.style.display = 'none'; }, 6000);
+  }, 300);
+}
+function rejectRequest() {
+  const name = document.getElementById('reqPeerName').textContent;
+  closeSheet();
+  setTimeout(() => showToast(`❌ Permintaan dari ${name} ditolak.`, false), 300);
+}
+
+function showToast(msg, isAccept) {
+  const t = document.getElementById('connectedToast');
+  document.getElementById('toastText').textContent = msg;
+  t.style.display = 'flex';
+  t.style.borderColor = isAccept ? '#00e67650' : '#ff174450';
+  t.querySelector('button').style.display = 'none';
+  setTimeout(() => { t.style.display = 'none'; }, 3500);
+}
+function openChatFromToast() {
+  document.getElementById('connectedToast').style.display = 'none';
+  if (toastPeer) openChat(toastPeer);
+}
+
+function toggleRadar() {
+  radarActive = !radarActive;
+  const btn = document.getElementById('radarBtn');
+  const dot = document.getElementById('statusDot');
+  if (radarActive) {
+    btn.textContent = 'NONAKTIF'; btn.style.cssText = 'background:#0d2a1a; border:1px solid #00e676; color:#00e676; border-radius:8px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap;';
+    dot.style.background = '#00e676'; dot.className = 'blink';
+    document.getElementById('statusText').textContent = 'Radar aktif · Memindai gelombang sekitar...';
+  } else {
+    btn.textContent = 'AKTIFKAN'; btn.style.cssText = 'background:#0f172a; border:1px solid #334155; color:#94a3b8; border-radius:8px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap;';
+    dot.style.background = '#475569'; dot.className = '';
+    document.getElementById('statusText').textContent = 'Radar tidak aktif';
+  }
+}
+
+function showNotifDemo() {
+  document.getElementById('notifOverlay').style.display = 'flex';
+}
+function hideNotif() {
+  document.getElementById('notifOverlay').style.display = 'none';
+  setTimeout(() => showConnectionRequest('Shadow-7E91'), 500);
+}
+
+function setScenario(s) {
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active-scenario'));
+  document.getElementById('scen-'+s).classList.add('active-scenario');
+  closeSheet();
+  document.getElementById('connectedToast').style.display = 'none';
+  document.getElementById('notifOverlay').style.display = 'none';
+  document.getElementById('screen-chat').classList.remove('active');
+  document.getElementById('sosFab').style.display = '';
+  switchTab('radar');
+
+  if (s === 'radar') {
+    // default
+  } else if (s === 'request') {
+    setTimeout(() => showPeerSheet('Shadow-7E91', 'Relawan', 'found'), 400);
+  } else if (s === 'accept') {
+    setTimeout(() => showConnectionRequest('Ghost-A4F2'), 400);
+  } else if (s === 'chat') {
+    setTimeout(() => openChat('Ghost-A4F2'), 400);
+  } else if (s === 'notif') {
+    setTimeout(() => showNotifDemo(), 400);
+  }
+}
+</script>
 </body>
 </html>

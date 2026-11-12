@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen>
   StreamSubscription<IncomingMessage>? _messageSub;
   StreamSubscription<String>? _statusSub;
   StreamSubscription<String>? _receiptSub;
-
+  StreamSubscription<DiscoveredPeerInfo>? _connectedPeerSub;
   List<DiscoveredPeerInfo> _peers = [];
   List<ConversationModel> _conversations = [];
   Set<String> _savedPeerNodeIds = {};
@@ -85,6 +85,25 @@ class _HomeScreenState extends State<HomeScreen>
     });
     _requestSub = _conn.requestStream.listen(_handleIncomingRequest);
     _messageSub = _conn.messageStream.listen(_handleIncomingMessage);
+
+    // Auto-open chat when connection is accepted and established
+    _connectedPeerSub = _conn.connectedPeerStream.listen((peer) {
+      if (!mounted) return;
+      _loadConversations();
+      // Show snackbar that we're now connected
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🟢 Terhubung dengan ${peer.displayName}! Memulai sesi chat...'),
+          backgroundColor: AppTheme.primaryEmerald,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'BUKA CHAT',
+            textColor: Colors.black,
+            onPressed: () => _openChat(peer.endpointId, peer.displayName),
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _loadConversations() async {
@@ -98,13 +117,51 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _handleIncomingRequest(IncomingRequest req) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('🟢 Terhubung dengan ${req.displayName} via radio offline'),
-        backgroundColor: AppTheme.primaryEmerald,
-        duration: const Duration(seconds: 2),
+
+    // Auto-dismiss after 30 seconds (auto-reject)
+    Timer? autoRejectTimer;
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ConnectionRequestSheet(
+        request: req,
+        onAccept: () {
+          autoRejectTimer?.cancel();
+          Navigator.of(ctx).pop();
+          _conn.acceptConnection(req.endpointId);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Permintaan dari ${req.displayName} diterima. Menunggu koneksi...'),
+              backgroundColor: AppTheme.primaryEmerald,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        },
+        onReject: () {
+          autoRejectTimer?.cancel();
+          Navigator.of(ctx).pop();
+          _conn.rejectConnection(req.endpointId);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Permintaan dari ${req.displayName} ditolak.'),
+              backgroundColor: AppTheme.surfaceLight,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
       ),
     );
+
+    // Start countdown — auto-reject after 30s
+    autoRejectTimer = Timer(const Duration(seconds: 30), () {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+        _conn.rejectConnection(req.endpointId);
+      }
+    });
   }
 
   void _handleIncomingMessage(IncomingMessage msg) {
@@ -594,6 +651,7 @@ class _HomeScreenState extends State<HomeScreen>
     _messageSub?.cancel();
     _statusSub?.cancel();
     _receiptSub?.cancel();
+    _connectedPeerSub?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -1806,6 +1864,228 @@ class _ConversationsTabState extends State<_ConversationsTab> {
         ),
       ),
       onSelected: (_) => setState(() => _selectedFilter = index),
+    );
+  }
+}
+
+// ── CONNECTION REQUEST BOTTOM SHEET ───────────────────────────────────────────
+class _ConnectionRequestSheet extends StatefulWidget {
+  final IncomingRequest request;
+  final VoidCallback onAccept;
+  final VoidCallback onReject;
+
+  const _ConnectionRequestSheet({
+    required this.request,
+    required this.onAccept,
+    required this.onReject,
+  });
+
+  @override
+  State<_ConnectionRequestSheet> createState() => _ConnectionRequestSheetState();
+}
+
+class _ConnectionRequestSheetState extends State<_ConnectionRequestSheet> {
+  int _secondsLeft = 30;
+  Timer? _countdownTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_secondsLeft <= 1) {
+        t.cancel();
+        if (mounted) widget.onReject();
+      } else {
+        if (mounted) setState(() => _secondsLeft--);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = _secondsLeft / 30.0;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A2332),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Animated radar icon
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.accentCyan.withAlpha(20),
+                  border: Border.all(color: AppTheme.accentCyan.withAlpha(80), width: 2),
+                ),
+              ),
+              const Icon(Icons.wifi_tethering_rounded, color: AppTheme.accentCyan, size: 36),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Title
+          const Text(
+            'PERMINTAAN TERHUBUNG',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Peer name
+          Text(
+            widget.request.displayName,
+            style: const TextStyle(
+              color: AppTheme.primaryEmerald,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'ingin terhubung ke jaringan mesh Anda',
+            style: const TextStyle(color: Colors.white60, fontSize: 13),
+          ),
+          const SizedBox(height: 6),
+
+          // Auth token / PIN for verification
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: BoxDecoration(
+              color: AppTheme.darkBackground,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.surfaceLight.withAlpha(80)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.verified_user_outlined, color: Colors.white38, size: 14),
+                const SizedBox(width: 6),
+                Text(
+                  'Token: ${widget.request.authToken.length > 12 ? widget.request.authToken.substring(0, 12) : widget.request.authToken}',
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Countdown bar
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Auto-tolak dalam:', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                  Text(
+                    '$_secondsLeft detik',
+                    style: TextStyle(
+                      color: _secondsLeft < 10 ? AppTheme.emergencyRed : Colors.white54,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: AppTheme.surfaceLight.withAlpha(60),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    _secondsLeft < 10 ? AppTheme.emergencyRed : AppTheme.accentCyan,
+                  ),
+                  minHeight: 5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Accept / Reject buttons
+          Row(
+            children: [
+              // TOLAK button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: widget.onReject,
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  label: const Text(
+                    'TOLAK',
+                    style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.emergencyRed,
+                    side: const BorderSide(color: AppTheme.emergencyRed, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              // TERIMA button
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: widget.onAccept,
+                  icon: const Icon(Icons.check_rounded, size: 22, color: Colors.black),
+                  label: const Text(
+                    'TERIMA',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryEmerald,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

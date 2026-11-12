@@ -422,7 +422,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Divider(color: Colors.white12, height: 18),
                 _InfoRow('Protokol Jaringan', 'OFFMAS Mesh v2 / Multi-Hop Flood DTN'),
                 const Divider(color: Colors.white12, height: 18),
-                _InfoRow('Mode Fisik', 'Bluetooth Low Energy + Wi-Fi Direct Hybrid'),
+                _InfoRow('Mode Fisik', 'Bluetooth Radio P2P (100% Murni Offline)'),
                 const Divider(color: Colors.white12, height: 18),
                 _InfoRow('Kompatibilitas', 'Android 6.0+ s/d Android 15 & iOS 13+'),
               ],

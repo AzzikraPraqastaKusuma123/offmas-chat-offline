@@ -10,7 +10,6 @@ class PermissionHelper {
           Permission.bluetoothScan,
           Permission.bluetoothAdvertise,
           Permission.bluetoothConnect,
-          Permission.nearbyWifiDevices,
           Permission.location,
         ].request();
 
